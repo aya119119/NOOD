@@ -1,8 +1,12 @@
 """
-This module provides body language / emotion detection from a video
-file (.mp4), we use a pretrained scikit learn model loaded from a
-pickle file and mediapipe holistic to extract pose + face landmarks
-for classification
+Body Language Emotion Detection using MediaPipe, OpenCV, and tensorflow
+
+This module detects body language emotions from a video file (.mp4), it uses a TensorFlow model (body_language.tflite) for classification
+and MediaPipe Holistic to extract pose + face landmarks as features
+
+The model was trained on 9 emotion classes:
+    Angry, Confused, Excited, Happy, Pain, Sad, Surprised, Tension
+
 
 Usage:
     python body_language_detector.py --video VIDEO_PATH [--model MODEL_PATH]
@@ -10,29 +14,45 @@ Usage:
 Dependencies:
     - mediapipe
     - opencv-python
-    - pandas
     - numpy
-    - scikit-learn
+    - tensorflow  (or tflite-runtime)
 """
 
 import argparse
 import os
-import pickle
 import warnings
 
 import cv2
 import mediapipe as mp
 import numpy as np
-import pandas as pd
+
+try:
+    import tensorflow as tf
+    _Interpreter = tf.lite.Interpreter
+except ImportError:
+    import tflite_runtime.interpreter as tflite
+    _Interpreter = tflite.Interpreter
 
 
-# mediaPipe helpers
+CLASS_NAMES = [
+    "Angry",
+    "Confused",
+    "Excited",
+    "Happy",
+    "Pain",
+    "Sad",
+    "Surprised",
+    "Tension",
+]
+
+
+#MediaPipe helpers
 mp_drawing = mp.solutions.drawing_utils
 mp_holistic = mp.solutions.holistic
 
 
 def draw_landmarks(image, results):
-    """draw face, hand, and pose landmarks on the frame."""
+    """Draw face, hand, and pose landmarks on the frame."""
 
     #face mesh contours
     mp_drawing.draw_landmarks(
@@ -74,7 +94,7 @@ def draw_landmarks(image, results):
 def extract_landmarks(results):
     """
     Extract pose and face landmark coordinates from a MediaPipe Holistic
-    result and return them as a single flat list.
+    result and return them as a single flat numpy array (float32).
 
     Returns ``None`` when either pose or face landmarks are missing.
     """
@@ -82,32 +102,64 @@ def extract_landmarks(results):
         return None
 
     pose = results.pose_landmarks.landmark
-    pose_row = list(
-        np.array(
-            [[lm.x, lm.y, lm.z, lm.visibility] for lm in pose]
-        ).flatten()
-    )
+    pose_row = np.array(
+        [[lm.x, lm.y, lm.z, lm.visibility] for lm in pose],
+        dtype=np.float32,
+    ).flatten()
 
     face = results.face_landmarks.landmark
-    face_row = list(
-        np.array(
-            [[lm.x, lm.y, lm.z, lm.visibility] for lm in face]
-        ).flatten()
-    )
+    face_row = np.array(
+        [[lm.x, lm.y, lm.z, lm.visibility] for lm in face],
+        dtype=np.float32,
+    ).flatten()
 
-    return pose_row + face_row
+    return np.concatenate([pose_row, face_row])
 
 
-# Overlay helpers
+#tensorflow inference helper
+class EmotionClassifier:
+    """Thin wrapper around a TF interpreter for emotion prediction"""
+
+    def __init__(self, model_path: str):
+        self.interpreter = _Interpreter(model_path=model_path)
+        self.interpreter.allocate_tensors()
+
+        self._input_details = self.interpreter.get_input_details()
+        self._output_details = self.interpreter.get_output_details()
+
+    def predict(self, features: np.ndarray):
+        """
+        Run inference on a 1D feature vector
+
+        Returns
+        -------
+        class_name : str
+            The predicted emotion label.
+        probabilities : np.ndarray
+            Softmax probability array over all classes.
+        """
+        #ensure correct shape and dtype
+        input_data = features.astype(np.float32).reshape(
+            self._input_details[0]["shape"]
+        )
+
+        self.interpreter.set_tensor(self._input_details[0]["index"], input_data)
+        self.interpreter.invoke()
+        probabilities = self.interpreter.get_tensor(
+            self._output_details[0]["index"]
+        )[0]
+
+        class_idx = int(np.argmax(probabilities))
+        class_name = CLASS_NAMES[class_idx] if class_idx < len(CLASS_NAMES) else str(class_idx)
+        return class_name, probabilities
+
+
+#overlay helpers #TODO:delete later
 def draw_prediction_overlay(image, body_language_class, body_language_prob, results):
-    """
-    Draw the predicted class label and probability on the image.
-    A label is placed near the left ear and a status box is drawn at the
-    top-left corner of the frame.
-    """
+  
     h, w, _ = image.shape
 
-    #label near the left ear
+    # Label near the left ear
     coords = tuple(
         np.multiply(
             np.array(
@@ -142,10 +194,8 @@ def draw_prediction_overlay(image, body_language_class, body_language_prob, resu
         cv2.LINE_AA,
     )
 
-    #status box at top left
     cv2.rectangle(image, (0, 0), (250, 60), (245, 117, 16), -1)
 
-    #display class
     cv2.putText(
         image,
         "CLASS",
@@ -167,7 +217,6 @@ def draw_prediction_overlay(image, body_language_class, body_language_prob, resu
         cv2.LINE_AA,
     )
 
-    #display probability
     cv2.putText(
         image,
         "PROB",
@@ -180,7 +229,7 @@ def draw_prediction_overlay(image, body_language_class, body_language_prob, resu
     )
     cv2.putText(
         image,
-        str(round(body_language_prob[np.argmax(body_language_prob)], 2)),
+        str(round(float(body_language_prob[np.argmax(body_language_prob)]), 2)),
         (10, 40),
         cv2.FONT_HERSHEY_SIMPLEX,
         1,
@@ -191,22 +240,13 @@ def draw_prediction_overlay(image, body_language_class, body_language_prob, resu
 
 
 
-#main detection loop
 def run_detection(model_path: str, video_path: str):
-    """
-    Parameters
-    ----------
-    model_path : str
-        path to the trained scikit learn model saved as a pickle file.
-    video_path : str
-        path to the input .mp4 video file.
-    """
-    if not os.path.isfile(video_path):
+   if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
+    if not os.path.isfile(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    #load trained model
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
+    classifier = EmotionClassifier(model_path)
 
     warnings.filterwarnings("ignore")
 
@@ -224,23 +264,18 @@ def run_detection(model_path: str, video_path: str):
             image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
             image.flags.writeable = False
 
-
             results = holistic.process(image)
 
-            #color back to BGR for rendering
+            #recolor back to BGR for rendering
             image.flags.writeable = True
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
-            #Draw landmarks #TODO:dismiss this
             draw_landmarks(image, results)
 
-            #export coordinates  predict
             try:
                 row = extract_landmarks(results)
                 if row is not None:
-                    X = pd.DataFrame([row])
-                    body_language_class = model.predict(X)[0]
-                    body_language_prob = model.predict_proba(X)[0]
+                    body_language_class, body_language_prob = classifier.predict(row)
 
                     draw_prediction_overlay(
                         image, body_language_class, body_language_prob, results
@@ -257,10 +292,10 @@ def run_detection(model_path: str, video_path: str):
     cv2.destroyAllWindows()
 
 
-# CLI entry point
+
 def main():
     parser = argparse.ArgumentParser(
-        description="Body language detection from a video file using MediaPipe + OpenCV."
+        description="Body language detection from a video file using MediaPipe + TFLite."
     )
     parser.add_argument(
         "--video",
@@ -271,8 +306,8 @@ def main():
     parser.add_argument(
         "--model",
         type=str,
-        default=os.path.join(os.path.dirname(__file__), "body_language.pkl"),
-        help="Path to the trained model pickle file (default: body_language.pkl).",
+        default=os.path.join(os.path.dirname(__file__), "body_language.tflite"),
+        help="Path to the TFLite model file (default: body_language.tflite).",
     )
     args = parser.parse_args()
 
