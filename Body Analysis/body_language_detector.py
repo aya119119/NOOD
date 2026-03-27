@@ -154,6 +154,103 @@ class EmotionClassifier:
         return class_name, probabilities
 
 
+def run_analysis(video_path: str, model_path: str = None) -> dict:
+    """
+    Headless analysis: process every frame and return structured results.
+
+    Parameters
+    ----------
+    video_path : str
+        Path to the input video file.
+    model_path : str, optional
+        Path to the TFLite model. Defaults to body_language.tflite next to this script.
+
+    Returns
+    -------
+    dict
+        {
+            "frames": [{"timestamp_s": float, "emotion": str, "confidence": float}, ...],
+            "summary": {
+                "total_frames_analyzed": int,
+                "dominant_emotion": str,
+                "dominant_emotion_pct": float,
+                "average_confidence": float,
+                "emotion_distribution": {emotion: percentage, ...},
+                "duration_s": float,
+            }
+        }
+    """
+    if model_path is None:
+        model_path = os.path.join(os.path.dirname(__file__), "body_language.tflite")
+
+    if not os.path.isfile(video_path):
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+    if not os.path.isfile(model_path):
+        raise FileNotFoundError(f"Model file not found: {model_path}")
+
+    classifier = EmotionClassifier(model_path)
+    warnings.filterwarnings("ignore")
+
+    cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
+
+    frames = []
+    frame_idx = 0
+
+    with mp_holistic.Holistic(
+        min_detection_confidence=0.5, min_tracking_confidence=0.5
+    ) as holistic:
+        while cap.isOpened():
+            ret, frame = cap.read()
+            if not ret:
+                break
+
+            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            image.flags.writeable = False
+            results = holistic.process(image)
+
+            row = extract_landmarks(results)
+            if row is not None:
+                emotion, probs = classifier.predict(row)
+                confidence = float(probs[int(np.argmax(probs))])
+                frames.append({
+                    "timestamp_s": round(frame_idx / fps, 3),
+                    "emotion": emotion,
+                    "confidence": round(confidence, 4),
+                })
+
+            frame_idx += 1
+
+    cap.release()
+
+    # Build summary
+    total = len(frames)
+    duration = frame_idx / fps if fps > 0 else 0.0
+
+    if total > 0:
+        from collections import Counter
+        emotion_counts = Counter(f["emotion"] for f in frames)
+        dominant = emotion_counts.most_common(1)[0]
+        avg_conf = sum(f["confidence"] for f in frames) / total
+        distribution = {e: round(c / total * 100, 1) for e, c in emotion_counts.items()}
+    else:
+        dominant = ("Unknown", 0)
+        avg_conf = 0.0
+        distribution = {}
+
+    return {
+        "frames": frames,
+        "summary": {
+            "total_frames_analyzed": total,
+            "dominant_emotion": dominant[0],
+            "dominant_emotion_pct": round(dominant[1] / max(total, 1) * 100, 1),
+            "average_confidence": round(avg_conf, 4),
+            "emotion_distribution": distribution,
+            "duration_s": round(duration, 2),
+        },
+    }
+
+
 #overlay helpers #TODO:delete later
 def draw_prediction_overlay(image, body_language_class, body_language_prob, results):
   
@@ -241,7 +338,7 @@ def draw_prediction_overlay(image, body_language_class, body_language_prob, resu
 
 
 def run_detection(model_path: str, video_path: str):
-   if not os.path.isfile(video_path):
+    if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
