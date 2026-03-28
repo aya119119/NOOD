@@ -1,0 +1,47 @@
+{
+  "meta": {
+    "generated_at": "2026-03-28T10:13:38.046619",
+    "transcript_preview": "test_transcript.txt"
+  },
+  "speech": {},
+  "body_language": {},
+  "language_and_content": {
+    "grammar": {
+      "errors_detected": 0,
+      "examples": [],
+      "grammar_score": 10.0,
+      "feedback": "Excellent grammar throughout. No errors detected.",
+      "model_used": "AventIQ-AI/T5-small-grammar-correction"
+    },
+    "sentence_structure": {
+      "average_length": 1.0,
+      "length_variety": 0.0,
+      "total_sentences": 1,
+      "short_sentences": 1,
+      "long_sentences": 0,
+      "variety_level": "low",
+      "category": "choppy",
+      "feedback": "Short average sentence length (1.0 words). Low variety in sentence length (σ=0.0). Many short sentences (100% are ≤5 words).",
+      "suggestions": [
+        "Vary your sentence length to maintain audience interest.",
+        "Alternate between short punchy sentences and longer complex ones.",
+        "Combine some short sentences to create more complex ideas.",
+        "Use longer sentences for ideas that deserve elaboration."
+      ]
+    },
+    "vocabulary": {
+      "total_words": 1,
+      "unique_words": 1,
+      "type_token_ratio": 1.0,
+      "vocabulary_level": "advanced",
+      "richness_score": 10.0,
+      "common_words": 0,
+      "rare_words": 1,
+      "feedback": "Advanced vocabulary level (TTR=1.00). Excellent richness score (10.0/10). High word uniqueness (1 unique from 1 total).",
+      "suggestions": [
+        "Excellent lexical diversity. Maintain this level of vocabulary richness."
+      ]
+    }
+  },
+  "final_confidence_score": 0.0
+}

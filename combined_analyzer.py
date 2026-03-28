@@ -104,6 +104,20 @@ class SentenceStructureReport:
     suggestions: List[str]
 
 
+@dataclass
+class VocabularyReport:
+    """Vocabulary and lexical diversity analysis report."""
+    total_words: int
+    unique_words: int
+    type_token_ratio: float  # TTR: unique_words / total_words (0.0-1.0)
+    vocabulary_level: str   # "basic", "intermediate", "advanced"
+    richness_score: float   # 0-10 scale
+    common_words_count: int  # Words in top 1000 most common
+    rare_words_count: int    # Words not in top 1000
+    feedback: str
+    suggestions: List[str]
+
+
 # ============================================================================
 # GRAMMAR CORRECTION MODULE
 # ============================================================================
@@ -487,11 +501,185 @@ def _generate_sentence_feedback(
 
 
 # ============================================================================
+# VOCABULARY ANALYSIS MODULE
+# ============================================================================
+
+# Top 1000 most common English words (frequency-based, for richness scoring)
+# This is a simplified list; source: https://en.wiktionary.org/wiki/Wiktionary:Frequency_lists
+COMMON_WORDS = {
+    'the', 'be', 'to', 'of', 'and', 'a', 'in', 'that', 'have', 'i',
+    'it', 'for', 'not', 'on', 'with', 'he', 'as', 'you', 'do', 'at',
+    'this', 'but', 'his', 'by', 'from', 'they', 'we', 'say', 'her', 'she',
+    'or', 'an', 'will', 'my', 'one', 'all', 'would', 'there', 'their', 'what',
+    'so', 'up', 'out', 'if', 'about', 'who', 'get', 'which', 'go', 'me',
+    'when', 'make', 'can', 'like', 'time', 'no', 'just', 'him', 'know', 'take',
+    'people', 'into', 'year', 'your', 'good', 'some', 'could', 'them', 'see', 'other',
+    'than', 'then', 'now', 'look', 'only', 'come', 'its', 'over', 'think', 'also',
+    'back', 'after', 'use', 'two', 'how', 'our', 'work', 'first', 'well', 'way',
+    'even', 'new', 'want', 'because', 'any', 'these', 'give', 'day', 'most', 'us',
+    'is', 'was', 'are', 'been', 'being', 'have', 'has', 'had', 'do', 'does', 'did',
+    'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'shall',
+    'am', 'are', 'is', 'was', 'were', 'where', 'why', 'how', 'what', 'when', 'which'
+}
+
+
+def analyze_vocabulary(transcript: str, verbose: bool = False) -> VocabularyReport:
+    """
+    Analyze vocabulary richness and lexical diversity in transcript.
+    
+    Metrics:
+      - Type-Token Ratio (TTR): unique_words / total_words
+        * Low TTR (< 0.40): less diverse vocabulary
+        * High TTR (> 0.60): more diverse, sophisticated vocabulary
+      - Unique word count
+      - Rare vs. common word ratio
+      - Overall vocabulary richness score (0-10)
+    
+    Args:
+        transcript: Full speech transcript text
+        verbose: Whether to print progress
+    
+    Returns:
+        VocabularyReport object with metrics and suggestions
+    """
+    if not transcript or len(transcript.strip()) == 0:
+        return VocabularyReport(
+            total_words=0,
+            unique_words=0,
+            type_token_ratio=0.0,
+            vocabulary_level="none",
+            richness_score=0.0,
+            common_words_count=0,
+            rare_words_count=0,
+            feedback="No transcript provided for vocabulary analysis.",
+            suggestions=[],
+        )
+    
+    if verbose:
+        print("\n  Analyzing vocabulary…", flush=True)
+    
+    # Extract words (lowercase, alphanumeric only)
+    import re
+    words = re.findall(r'\b[a-z]+\b', transcript.lower())
+    
+    if len(words) == 0:
+        return VocabularyReport(
+            total_words=0,
+            unique_words=0,
+            type_token_ratio=0.0,
+            vocabulary_level="none",
+            richness_score=0.0,
+            common_words_count=0,
+            rare_words_count=0,
+            feedback="No words found in transcript.",
+            suggestions=[],
+        )
+    
+    # Calculate basic metrics
+    total_words = len(words)
+    unique_words = len(set(words))
+    type_token_ratio = unique_words / total_words if total_words > 0 else 0.0
+    
+    # Count common vs. rare words
+    unique_word_set = set(words)
+    common_count = sum(1 for w in unique_word_set if w in COMMON_WORDS)
+    rare_count = unique_words - common_count
+    
+    # Determine vocabulary level based on TTR
+    if type_token_ratio < 0.40:
+        vocab_level = "basic"
+    elif type_token_ratio < 0.60:
+        vocab_level = "intermediate"
+    else:
+        vocab_level = "advanced"
+    
+    # Calculate richness score (0-10)
+    # Formula: combine TTR, unique word count, and rare word ratio
+    ttr_score = min(10.0, type_token_ratio * 15)  # Scale 0-1 to 0-15, cap at 10
+    unique_score = min(10.0, (unique_words / max(total_words * 0.5, 1)) * 10)  # Reward high unique count
+    rare_score = (rare_count / unique_words * 10) if unique_words > 0 else 0  # Reward rare words
+    
+    richness_score = (ttr_score * 0.4 + unique_score * 0.3 + rare_score * 0.3)
+    richness_score = round(min(10.0, richness_score), 1)
+    
+    # Generate feedback and suggestions
+    feedback, suggestions = _generate_vocabulary_feedback(
+        type_token_ratio, vocab_level, richness_score, unique_words, total_words
+    )
+    
+    if verbose:
+        print(f"    TTR: {type_token_ratio:.2f}, Level: {vocab_level}, Score: {richness_score}/10", flush=True)
+    
+    return VocabularyReport(
+        total_words=total_words,
+        unique_words=unique_words,
+        type_token_ratio=round(type_token_ratio, 3),
+        vocabulary_level=vocab_level,
+        richness_score=richness_score,
+        common_words_count=common_count,
+        rare_words_count=rare_count,
+        feedback=feedback,
+        suggestions=suggestions,
+    )
+
+
+def _generate_vocabulary_feedback(
+    ttr: float,
+    vocab_level: str,
+    richness_score: float,
+    unique_words: int,
+    total_words: int,
+) -> Tuple[str, List[str]]:
+    """Generate feedback and suggestions for vocabulary richness."""
+    suggestions = []
+    feedback_parts = []
+    
+    # Level description
+    if vocab_level == "basic":
+        feedback_parts.append(f"Basic vocabulary level (TTR={ttr:.2f})")
+        suggestions.append("Use more varied and precise words to enhance sophistication.")
+        suggestions.append("Replace common words with synonyms to increase diversity.")
+        suggestions.append("Explore subject-specific terminology relevant to your topic.")
+    elif vocab_level == "intermediate":
+        feedback_parts.append(f"Intermediate vocabulary level (TTR={ttr:.2f})")
+        suggestions.append("Good vocabulary variety, but room for enhancement.")
+        suggestions.append("Introduce more domain-specific or less common words where appropriate.")
+    else:
+        feedback_parts.append(f"Advanced vocabulary level (TTR={ttr:.2f})")
+        suggestions.append("Excellent lexical diversity. Maintain this level of vocabulary richness.")
+    
+    # Score description
+    if richness_score >= 8.0:
+        feedback_parts.append(f"Excellent richness score ({richness_score}/10)")
+    elif richness_score >= 6.0:
+        feedback_parts.append(f"Good richness score ({richness_score}/10)")
+    elif richness_score >= 4.0:
+        feedback_parts.append(f"Moderate richness score ({richness_score}/10)")
+    else:
+        feedback_parts.append(f"Low richness score ({richness_score}/10)")
+    
+    # Unique word feedback
+    unique_rate = unique_words / total_words if total_words > 0 else 0
+    if unique_rate > 0.6:
+        feedback_parts.append(f"High word uniqueness ({unique_words} unique from {total_words} total)")
+    elif unique_rate > 0.4:
+        feedback_parts.append(f"Moderate word uniqueness ({unique_words} unique from {total_words} total)")
+    else:
+        feedback_parts.append(f"Low word uniqueness ({unique_words} unique from {total_words} total)")
+        if "words to enhance" not in suggestions[0].lower():
+            suggestions.insert(0, "Reduce word repetition by using synonyms and varied phrasing.")
+    
+    feedback = ". ".join(feedback_parts) + "."
+    
+    return feedback, suggestions
+
+
+# ============================================================================
 # COMBINED ANALYZER CLASS
 # ============================================================================
 
 class SpeechAndBodyLanguageAnalyzer:
-    """Main analyzer combining speech, body language, grammar, and sentence structure analysis."""
+    """Main analyzer combining speech, body language, grammar, sentence structure, and vocabulary analysis."""
     
     def __init__(self, transcript: str = "", speech_report: Optional[dict] = None, 
                  body_language_report: Optional[dict] = None):
@@ -499,7 +687,7 @@ class SpeechAndBodyLanguageAnalyzer:
         Initialize analyzer.
         
         Args:
-            transcript: Speech transcript (used for grammar and sentence structure analysis)
+            transcript: Speech transcript (used for grammar, sentence structure, and vocabulary analysis)
             speech_report: Pre-computed speech analysis report (optional)
             body_language_report: Pre-computed body language analysis report (optional)
         """
@@ -508,6 +696,7 @@ class SpeechAndBodyLanguageAnalyzer:
         self.body_language_report = body_language_report or {}
         self.grammar_report = None
         self.sentence_structure_report = None
+        self.vocabulary_report = None
     
     def analyze_grammar(self, verbose: bool = False) -> GrammarReport:
         """Analyze grammar in the transcript."""
@@ -533,6 +722,18 @@ class SpeechAndBodyLanguageAnalyzer:
         
         return self.sentence_structure_report
     
+    def analyze_vocabulary(self, verbose: bool = False) -> VocabularyReport:
+        """Analyze vocabulary and lexical diversity in the transcript."""
+        print("\n══ Vocabulary Analysis starting…", flush=True)
+        t0 = __import__('time').time()
+        
+        self.vocabulary_report = analyze_vocabulary(self.transcript, verbose=verbose)
+        
+        elapsed = __import__('time').time() - t0
+        print(f"══ Vocabulary analysis done ({elapsed:.1f}s)", flush=True)
+        
+        return self.vocabulary_report
+    
     def analyze_speech(self) -> Dict:
         """
         Placeholder for speech analysis.
@@ -552,7 +753,7 @@ class SpeechAndBodyLanguageAnalyzer:
     def run_analysis(self) -> Dict:
         """Run all analyses and generate combined report."""
         print("\n" + "=" * 70)
-        print("  COMBINED ANALYSIS - Speech, Body Language, Grammar, & Structure")
+        print("  COMBINED ANALYSIS - Speech, Body, Grammar, Structure, Vocabulary")
         print("=" * 70)
         
         # Run analyses
@@ -560,6 +761,7 @@ class SpeechAndBodyLanguageAnalyzer:
         self.analyze_body_language()
         self.analyze_grammar(verbose=True)
         self.analyze_sentence_structure(verbose=True)
+        self.analyze_vocabulary(verbose=True)
         
         # Generate combined report
         report = self.generate_combined_report()
@@ -576,12 +778,15 @@ class SpeechAndBodyLanguageAnalyzer:
         - Language & Content:
           - Grammar (errors, score)
           - Sentence Structure (length, variety, suggestions)
+          - Vocabulary (richness, diversity, suggestions)
         - Final Confidence Score
         """
         if self.grammar_report is None:
             self.analyze_grammar()
         if self.sentence_structure_report is None:
             self.analyze_sentence_structure()
+        if self.vocabulary_report is None:
+            self.analyze_vocabulary()
         
         # Build the combined report
         report = {
@@ -609,6 +814,17 @@ class SpeechAndBodyLanguageAnalyzer:
                     "category": self.sentence_structure_report.sentence_length_category,
                     "feedback": self.sentence_structure_report.feedback,
                     "suggestions": self.sentence_structure_report.suggestions,
+                },
+                "vocabulary": {
+                    "total_words": self.vocabulary_report.total_words,
+                    "unique_words": self.vocabulary_report.unique_words,
+                    "type_token_ratio": self.vocabulary_report.type_token_ratio,
+                    "vocabulary_level": self.vocabulary_report.vocabulary_level,
+                    "richness_score": self.vocabulary_report.richness_score,
+                    "common_words": self.vocabulary_report.common_words_count,
+                    "rare_words": self.vocabulary_report.rare_words_count,
+                    "feedback": self.vocabulary_report.feedback,
+                    "suggestions": self.vocabulary_report.suggestions,
                 }
             },
             "final_confidence_score": 0.0,  # Placeholder for overall confidence
@@ -618,7 +834,7 @@ class SpeechAndBodyLanguageAnalyzer:
     
     def print_summary(self):
         """Print human-readable summary to console."""
-        if self.grammar_report is None or self.sentence_structure_report is None:
+        if self.grammar_report is None or self.sentence_structure_report is None or self.vocabulary_report is None:
             print("\n  [Warning] Not all analyses completed.")
             return
         
@@ -667,6 +883,22 @@ class SpeechAndBodyLanguageAnalyzer:
         if self.sentence_structure_report.suggestions:
             print(f"      Suggestions:")
             for i, suggestion in enumerate(self.sentence_structure_report.suggestions, 1):
+                print(f"        {i}. {suggestion}")
+        
+        # Vocabulary subsection
+        print(f"\n    Vocabulary:")
+        print(f"      Total words          : {self.vocabulary_report.total_words}")
+        print(f"      Unique words         : {self.vocabulary_report.unique_words}")
+        print(f"      Type-Token Ratio     : {self.vocabulary_report.type_token_ratio:.3f}")
+        print(f"      Level                : {self.vocabulary_report.vocabulary_level}")
+        print(f"      Common words         : {self.vocabulary_report.common_words_count}")
+        print(f"      Rare words           : {self.vocabulary_report.rare_words_count}")
+        print(f"      Richness score       : {self.vocabulary_report.richness_score}/10")
+        print(f"      Feedback             : {self.vocabulary_report.feedback}")
+        
+        if self.vocabulary_report.suggestions:
+            print(f"      Suggestions:")
+            for i, suggestion in enumerate(self.vocabulary_report.suggestions, 1):
                 print(f"        {i}. {suggestion}")
         
         print(f"\n  ▸ Final Confidence Score")
@@ -759,6 +991,7 @@ if __name__ == "__main__":
         )
         analyzer.analyze_grammar(verbose=True)
         analyzer.analyze_sentence_structure(verbose=True)
+        analyzer.analyze_vocabulary(verbose=True)
         report = analyzer.generate_combined_report()
         analyzer.print_summary()
     """
