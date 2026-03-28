@@ -1,0 +1,23 @@
+{
+  "meta": {
+    "generated_at": "2026-03-28T10:02:50.271661",
+    "transcript_preview": "transcript.txt"
+  },
+  "speech": {},
+  "body_language": {},
+  "language_and_content": {
+    "grammar": {
+      "errors_detected": 1,
+      "examples": [
+        {
+          "original": "transcript.txt",
+          "corrected": ""
+        }
+      ],
+      "grammar_score": 2.0,
+      "feedback": "Significant grammar issues (1 errors, 100.0% error rate). Substantial revision recommended.",
+      "model_used": "AventIQ-AI/T5-small-grammar-correction"
+    }
+  },
+  "final_confidence_score": 0.0
+}
