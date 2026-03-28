@@ -90,6 +90,20 @@ class GrammarReport:
     transcript_preview: str
 
 
+@dataclass
+class SentenceStructureReport:
+    """Sentence structure analysis report."""
+    avg_sentence_length: float  # Average number of words per sentence
+    sentence_length_std: float  # Standard deviation (variety measure)
+    total_sentences: int
+    short_sentences: int  # Sentences <= 5 words
+    long_sentences: int   # Sentences >= 20 words
+    variety_level: str    # "low", "moderate", "high"
+    sentence_length_category: str  # "choppy", "balanced", "dense"
+    feedback: str
+    suggestions: List[str]
+
+
 # ============================================================================
 # GRAMMAR CORRECTION MODULE
 # ============================================================================
@@ -310,11 +324,174 @@ def _has_simple_grammar_issues(sentence: str) -> bool:
 
 
 # ============================================================================
+# SENTENCE STRUCTURE ANALYSIS MODULE
+# ============================================================================
+
+def analyze_sentence_structure(transcript: str, verbose: bool = False) -> SentenceStructureReport:
+    """
+    Analyze sentence structure in transcript.
+    
+    Metrics:
+      - Average sentence length (words)
+      - Sentence length variety (standard deviation)
+      - Proportion of short vs. long sentences
+      - Overall classification (choppy, balanced, dense)
+    
+    Args:
+        transcript: Full speech transcript text
+        verbose: Whether to print progress
+    
+    Returns:
+        SentenceStructureReport object with metrics and feedback
+    """
+    if not transcript or len(transcript.strip()) == 0:
+        return SentenceStructureReport(
+            avg_sentence_length=0.0,
+            sentence_length_std=0.0,
+            total_sentences=0,
+            short_sentences=0,
+            long_sentences=0,
+            variety_level="none",
+            sentence_length_category="empty",
+            feedback="No transcript provided for sentence structure analysis.",
+            suggestions=[],
+        )
+    
+    if verbose:
+        print("\n  Analyzing sentence structure…", flush=True)
+    
+    # Split into sentences
+    sentences = _split_sentences(transcript)
+    
+    if len(sentences) == 0:
+        return SentenceStructureReport(
+            avg_sentence_length=0.0,
+            sentence_length_std=0.0,
+            total_sentences=0,
+            short_sentences=0,
+            long_sentences=0,
+            variety_level="none",
+            sentence_length_category="empty",
+            feedback="No sentences found in transcript.",
+            suggestions=[],
+        )
+    
+    # Calculate sentence lengths (in words)
+    sentence_lengths = []
+    for sentence in sentences:
+        # Count words (split by whitespace, filter empty)
+        words = [w for w in sentence.split() if w.strip()]
+        sentence_lengths.append(len(words))
+    
+    # Calculate statistics
+    avg_length = np.mean(sentence_lengths)
+    length_std = np.std(sentence_lengths)
+    
+    # Count short and long sentences
+    short_count = sum(1 for length in sentence_lengths if length <= 5)
+    long_count = sum(1 for length in sentence_lengths if length >= 20)
+    
+    # Determine variety level (based on std dev)
+    if length_std < 3.0:
+        variety_level = "low"
+    elif length_std < 6.0:
+        variety_level = "moderate"
+    else:
+        variety_level = "high"
+    
+    # Determine sentence structure category
+    short_pct = short_count / len(sentences) * 100
+    long_pct = long_count / len(sentences) * 100
+    
+    if short_pct > 40:
+        category = "choppy"
+    elif long_pct > 30:
+        category = "dense"
+    else:
+        category = "balanced"
+    
+    # Generate feedback and suggestions
+    feedback, suggestions = _generate_sentence_feedback(
+        avg_length, length_std, variety_level, category,
+        short_count, long_count, len(sentences)
+    )
+    
+    if verbose:
+        print(f"    Avg length: {avg_length:.1f} words, Variety: {variety_level}, Category: {category}", flush=True)
+    
+    return SentenceStructureReport(
+        avg_sentence_length=round(avg_length, 1),
+        sentence_length_std=round(length_std, 1),
+        total_sentences=len(sentences),
+        short_sentences=short_count,
+        long_sentences=long_count,
+        variety_level=variety_level,
+        sentence_length_category=category,
+        feedback=feedback,
+        suggestions=suggestions,
+    )
+
+
+def _generate_sentence_feedback(
+    avg_length: float,
+    std_dev: float,
+    variety_level: str,
+    category: str,
+    short_count: int,
+    long_count: int,
+    total_sentences: int,
+) -> Tuple[str, List[str]]:
+    """Generate feedback and actionable suggestions for sentence structure."""
+    suggestions = []
+    feedback_parts = []
+    
+    # Feedback on average length
+    if avg_length < 10:
+        feedback_parts.append(f"Short average sentence length ({avg_length:.1f} words)")
+    elif avg_length > 25:
+        feedback_parts.append(f"Long average sentence length ({avg_length:.1f} words)")
+    else:
+        feedback_parts.append(f"Moderate average sentence length ({avg_length:.1f} words)")
+    
+    # Feedback on variety
+    short_pct = short_count / total_sentences * 100 if total_sentences > 0 else 0
+    long_pct = long_count / total_sentences * 100 if total_sentences > 0 else 0
+    
+    if variety_level == "low":
+        feedback_parts.append(f"Low variety in sentence length (σ={std_dev:.1f})")
+        suggestions.append("Vary your sentence length to maintain audience interest.")
+        suggestions.append("Alternate between short punchy sentences and longer complex ones.")
+    elif variety_level == "moderate":
+        feedback_parts.append(f"Moderate variety in sentence length (σ={std_dev:.1f})")
+    else:
+        feedback_parts.append(f"High variety in sentence length (σ={std_dev:.1f})")
+        suggestions.append("Good balance in sentence length variation.")
+    
+    # Feedback on category
+    if category == "choppy":
+        feedback_parts.append(f"Many short sentences ({short_pct:.0f}% are ≤5 words)")
+        if "Vary your sentence length" not in suggestions:
+            suggestions.append("Combine some short sentences to create more complex ideas.")
+        suggestions.append("Use longer sentences for ideas that deserve elaboration.")
+    elif category == "dense":
+        feedback_parts.append(f"Many long sentences ({long_pct:.0f}% are ≥20 words)")
+        suggestions.append("Break up very long sentences into shorter, digestible segments.")
+        suggestions.append("Use periodic sentences: short sentence at the end for impact.")
+    else:
+        feedback_parts.append(f"Balanced sentence structure")
+        suggestions.append("Maintain this balance between short and long sentences.")
+    
+    feedback = ". ".join(feedback_parts) + "."
+    
+    return feedback, suggestions
+
+
+# ============================================================================
 # COMBINED ANALYZER CLASS
 # ============================================================================
 
 class SpeechAndBodyLanguageAnalyzer:
-    """Main analyzer combining speech, body language, and grammar analysis."""
+    """Main analyzer combining speech, body language, grammar, and sentence structure analysis."""
     
     def __init__(self, transcript: str = "", speech_report: Optional[dict] = None, 
                  body_language_report: Optional[dict] = None):
@@ -322,7 +499,7 @@ class SpeechAndBodyLanguageAnalyzer:
         Initialize analyzer.
         
         Args:
-            transcript: Speech transcript (used for grammar analysis)
+            transcript: Speech transcript (used for grammar and sentence structure analysis)
             speech_report: Pre-computed speech analysis report (optional)
             body_language_report: Pre-computed body language analysis report (optional)
         """
@@ -330,6 +507,7 @@ class SpeechAndBodyLanguageAnalyzer:
         self.speech_report = speech_report or {}
         self.body_language_report = body_language_report or {}
         self.grammar_report = None
+        self.sentence_structure_report = None
     
     def analyze_grammar(self, verbose: bool = False) -> GrammarReport:
         """Analyze grammar in the transcript."""
@@ -342,6 +520,18 @@ class SpeechAndBodyLanguageAnalyzer:
         print(f"══ Grammar analysis done ({elapsed:.1f}s)", flush=True)
         
         return self.grammar_report
+    
+    def analyze_sentence_structure(self, verbose: bool = False) -> SentenceStructureReport:
+        """Analyze sentence structure in the transcript."""
+        print("\n══ Sentence Structure Analysis starting…", flush=True)
+        t0 = __import__('time').time()
+        
+        self.sentence_structure_report = analyze_sentence_structure(self.transcript, verbose=verbose)
+        
+        elapsed = __import__('time').time() - t0
+        print(f"══ Sentence structure analysis done ({elapsed:.1f}s)", flush=True)
+        
+        return self.sentence_structure_report
     
     def analyze_speech(self) -> Dict:
         """
@@ -362,13 +552,14 @@ class SpeechAndBodyLanguageAnalyzer:
     def run_analysis(self) -> Dict:
         """Run all analyses and generate combined report."""
         print("\n" + "=" * 70)
-        print("  COMBINED ANALYSIS - Speech, Body Language, and Grammar")
+        print("  COMBINED ANALYSIS - Speech, Body Language, Grammar, & Structure")
         print("=" * 70)
         
         # Run analyses
         self.analyze_speech()
         self.analyze_body_language()
         self.analyze_grammar(verbose=True)
+        self.analyze_sentence_structure(verbose=True)
         
         # Generate combined report
         report = self.generate_combined_report()
@@ -382,11 +573,15 @@ class SpeechAndBodyLanguageAnalyzer:
         Format:
         - Speech Performance (WPM, filler rate, enthusiasm, etc.)
         - Body Language (emotions, confidence)
-        - Language & Content (grammar errors, score)
+        - Language & Content:
+          - Grammar (errors, score)
+          - Sentence Structure (length, variety, suggestions)
         - Final Confidence Score
         """
         if self.grammar_report is None:
             self.analyze_grammar()
+        if self.sentence_structure_report is None:
+            self.analyze_sentence_structure()
         
         # Build the combined report
         report = {
@@ -403,6 +598,17 @@ class SpeechAndBodyLanguageAnalyzer:
                     "grammar_score": self.grammar_report.grammar_score,
                     "feedback": self.grammar_report.feedback,
                     "model_used": self.grammar_report.model_used,
+                },
+                "sentence_structure": {
+                    "average_length": self.sentence_structure_report.avg_sentence_length,
+                    "length_variety": self.sentence_structure_report.sentence_length_std,
+                    "total_sentences": self.sentence_structure_report.total_sentences,
+                    "short_sentences": self.sentence_structure_report.short_sentences,
+                    "long_sentences": self.sentence_structure_report.long_sentences,
+                    "variety_level": self.sentence_structure_report.variety_level,
+                    "category": self.sentence_structure_report.sentence_length_category,
+                    "feedback": self.sentence_structure_report.feedback,
+                    "suggestions": self.sentence_structure_report.suggestions,
                 }
             },
             "final_confidence_score": 0.0,  # Placeholder for overall confidence
@@ -412,8 +618,8 @@ class SpeechAndBodyLanguageAnalyzer:
     
     def print_summary(self):
         """Print human-readable summary to console."""
-        if self.grammar_report is None:
-            print("\n  [Warning] No grammar analysis available.")
+        if self.grammar_report is None or self.sentence_structure_report is None:
+            print("\n  [Warning] Not all analyses completed.")
             return
         
         sep = "─" * 70
@@ -432,18 +638,36 @@ class SpeechAndBodyLanguageAnalyzer:
             print(f"\n  ▸ Body Language")
             print(f"    [Body language metrics would appear here]")
         
-        # Grammar section
+        # Language & Content section
         print(f"\n  ▸ Language & Content")
-        print(f"    Grammar errors detected  : {self.grammar_report.error_count}")
+        
+        # Grammar subsection
+        print(f"\n    Grammar:")
+        print(f"      Errors detected      : {self.grammar_report.error_count}")
         
         if self.grammar_report.error_examples:
-            print(f"    Examples:")
+            print(f"      Examples:")
             for i, example in enumerate(self.grammar_report.error_examples, 1):
-                print(f"      {i}. \"{example['original']}\"")
-                print(f"         → \"{example['corrected']}\"")
+                print(f"        {i}. \"{example['original']}\"")
+                print(f"           → \"{example['corrected']}\"")
         
-        print(f"    Grammar score            : {self.grammar_report.grammar_score}/10")
-        print(f"    Feedback                 : {self.grammar_report.feedback}")
+        print(f"      Grammar score        : {self.grammar_report.grammar_score}/10")
+        print(f"      Feedback             : {self.grammar_report.feedback}")
+        
+        # Sentence structure subsection
+        print(f"\n    Sentence Structure:")
+        print(f"      Average length       : {self.sentence_structure_report.avg_sentence_length} words")
+        print(f"      Length variety       : {self.sentence_structure_report.sentence_length_std} σ ({self.sentence_structure_report.variety_level})")
+        print(f"      Total sentences      : {self.sentence_structure_report.total_sentences}")
+        print(f"      Short sentences      : {self.sentence_structure_report.short_sentences} (≤5 words)")
+        print(f"      Long sentences       : {self.sentence_structure_report.long_sentences} (≥20 words)")
+        print(f"      Category             : {self.sentence_structure_report.sentence_length_category}")
+        print(f"      Feedback             : {self.sentence_structure_report.feedback}")
+        
+        if self.sentence_structure_report.suggestions:
+            print(f"      Suggestions:")
+            for i, suggestion in enumerate(self.sentence_structure_report.suggestions, 1):
+                print(f"        {i}. {suggestion}")
         
         print(f"\n  ▸ Final Confidence Score")
         print(f"    [Overall confidence score would appear here]")
@@ -534,6 +758,7 @@ if __name__ == "__main__":
             transcript="Your speech text here..."
         )
         analyzer.analyze_grammar(verbose=True)
+        analyzer.analyze_sentence_structure(verbose=True)
         report = analyzer.generate_combined_report()
         analyzer.print_summary()
     """
