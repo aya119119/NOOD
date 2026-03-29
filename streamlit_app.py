@@ -356,14 +356,19 @@ body {
 
 # Add project modules to path
 sys.path.insert(0, str(Path(__file__).parent))
+sys.path.insert(0, str(Path(__file__).parent / "Streamlit + Whisper"))
 sys.path.insert(0, str(Path(__file__).parent / "Speech Analysis"))
 
 try:
     from combined_analyzer import SpeechAndBodyLanguageAnalyzer
 except ImportError as e:
     st.error(f"❌ Import Error: {str(e)}")
-    st.markdown("""
-    **To fix:** Run `pip install -r requirements.txt`
+    st.markdown(f"""
+    **Import Error:** {str(e)}
+    
+    **To fix:**
+    1. Run `pip install -r requirements.txt`
+    2. Make sure combined_analyzer.py exists in the Streamlit + Whisper folder
     """)
     st.stop()
 
@@ -376,8 +381,8 @@ except ImportError as e:
 def get_asr_model():
     """Load ASR model once and cache it."""
     try:
-        from speech_analyzer import load_asr
-        return load_asr()
+        import speech_analyzer
+        return speech_analyzer.load_asr()
     except Exception as e:
         st.error(f"Failed to load speech recognition model: {str(e)}")
         return None
