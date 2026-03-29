@@ -1,18 +1,19 @@
 """
-Body Language Emotion Detection using MediaPipe, OpenCV, and tensorflow
+Body Language Emotion Detection using MediaPipe Tasks API, OpenCV, and TensorFlow Lite
 
-This module detects body language emotions from a video file (.mp4), it uses a TensorFlow model (body_language.tflite) for classification
-and MediaPipe Holistic to extract pose + face landmarks as features
+This module detects body language emotions from a video file (.mp4).
+It uses a TensorFlow Lite model (body_language.tflite) for classification
+and the new MediaPipe Tasks API (PoseLandmarker + FaceLandmarker) to
+extract pose + face landmarks as features.
 
 The model was trained on 9 emotion classes:
     Angry, Confused, Excited, Happy, Pain, Sad, Surprised, Tension
-
 
 Usage:
     python body_language_detector.py --video VIDEO_PATH [--model MODEL_PATH]
 
 Dependencies:
-    - mediapipe
+    - mediapipe  (>= 0.10.x, Tasks API)
     - opencv-python
     - numpy
     - tensorflow  (or tflite-runtime)
@@ -20,7 +21,9 @@ Dependencies:
 
 import argparse
 import os
+import urllib.request
 import warnings
+from pathlib import Path
 
 import cv2
 import mediapipe as mp
@@ -46,79 +49,114 @@ CLASS_NAMES = [
 ]
 
 
-#MediaPipe helpers
-mp_drawing = mp.solutions.drawing_utils
-mp_holistic = mp.solutions.holistic
+#MediaPipe Tasks API aliases
+BaseOptions = mp.tasks.BaseOptions
+PoseLandmarker = mp.tasks.vision.PoseLandmarker
+PoseLandmarkerOptions = mp.tasks.vision.PoseLandmarkerOptions
+FaceLandmarker = mp.tasks.vision.FaceLandmarker
+FaceLandmarkerOptions = mp.tasks.vision.FaceLandmarkerOptions
+VisionRunningMode = mp.tasks.vision.RunningMode
 
 
-def draw_landmarks(image, results):
-    """Draw face, hand, and pose landmarks on the frame."""
+#model download URLs (Google's official .task bundles)
+_MODEL_DIR = Path(__file__).resolve().parent / "mediapipe_models"
 
-    #face mesh contours
-    mp_drawing.draw_landmarks(
-        image,
-        results.face_landmarks,
-        mp_holistic.FACEMESH_CONTOURS,
-        mp_drawing.DrawingSpec(color=(80, 110, 10), thickness=1, circle_radius=1),
-        mp_drawing.DrawingSpec(color=(80, 256, 121), thickness=1, circle_radius=1),
+_POSE_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/"
+    "pose_landmarker/pose_landmarker_lite/float16/latest/pose_landmarker_lite.task"
+)
+_FACE_MODEL_URL = (
+    "https://storage.googleapis.com/mediapipe-models/"
+    "face_landmarker/face_landmarker/float16/latest/face_landmarker.task"
+)
+
+_POSE_MODEL_PATH = _MODEL_DIR / "pose_landmarker_lite.task"
+_FACE_MODEL_PATH = _MODEL_DIR / "face_landmarker.task"
+
+# The old Holistic model produced:
+#   33 pose landmarks x 4 (x, y, z, visibility) = 132
+#   468 face landmarks x 4 (x, y, z, visibility) = 1872
+#   Total = 2004 features
+# The new FaceLandmarker gives 478 face landmarks (no visibility field),
+# so we truncate to 468 and set visibility=0.0 to match the trained model.
+_OLD_FACE_LANDMARK_COUNT = 468
+_POSE_LANDMARK_COUNT = 33
+
+
+def _ensure_models():
+    """Download MediaPipe .task models if they don't already exist."""
+    _MODEL_DIR.mkdir(parents=True, exist_ok=True)
+
+    for url, dest in [(_POSE_MODEL_URL, _POSE_MODEL_PATH),
+                      (_FACE_MODEL_URL, _FACE_MODEL_PATH)]:
+        if not dest.exists():
+            print(f"  Downloading {dest.name}…", flush=True)
+            urllib.request.urlretrieve(url, str(dest))
+            print(f"  Saved → {dest}", flush=True)
+
+
+def _create_pose_landmarker() -> PoseLandmarker:
+    """Create a PoseLandmarker in VIDEO mode."""
+    options = PoseLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=str(_POSE_MODEL_PATH)),
+        running_mode=VisionRunningMode.VIDEO,
+        num_poses=1,
+        min_pose_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
     )
+    return PoseLandmarker.create_from_options(options)
 
-    #right hand
-    mp_drawing.draw_landmarks(
-        image,
-        results.right_hand_landmarks,
-        mp_holistic.HAND_CONNECTIONS,
-        mp_drawing.DrawingSpec(color=(80, 22, 10), thickness=2, circle_radius=4),
-        mp_drawing.DrawingSpec(color=(80, 44, 121), thickness=2, circle_radius=2),
+
+def _create_face_landmarker() -> FaceLandmarker:
+    """Create a FaceLandmarker in VIDEO mode."""
+    options = FaceLandmarkerOptions(
+        base_options=BaseOptions(model_asset_path=str(_FACE_MODEL_PATH)),
+        running_mode=VisionRunningMode.VIDEO,
+        num_faces=1,
+        min_face_detection_confidence=0.5,
+        min_tracking_confidence=0.5,
     )
-
-    #left hand
-    mp_drawing.draw_landmarks(
-        image,
-        results.left_hand_landmarks,
-        mp_holistic.HAND_CONNECTIONS,
-        mp_drawing.DrawingSpec(color=(121, 22, 76), thickness=2, circle_radius=4),
-        mp_drawing.DrawingSpec(color=(121, 44, 250), thickness=2, circle_radius=2),
-    )
-
-    #pose
-    mp_drawing.draw_landmarks(
-        image,
-        results.pose_landmarks,
-        mp_holistic.POSE_CONNECTIONS,
-        mp_drawing.DrawingSpec(color=(245, 117, 66), thickness=2, circle_radius=4),
-        mp_drawing.DrawingSpec(color=(245, 66, 230), thickness=2, circle_radius=2),
-    )
+    return FaceLandmarker.create_from_options(options)
 
 
-def extract_landmarks(results):
+def extract_landmarks(pose_result, face_result) -> np.ndarray | None:
     """
-    Extract pose and face landmark coordinates from a MediaPipe Holistic
-    result and return them as a single flat numpy array (float32).
+    Extract pose and face landmark coordinates from the new Tasks API results
+    and return them as a single flat numpy array (float32) matching the shape
+    expected by the TFLite emotion model (trained on the old Holistic output).
 
-    Returns ``None`` when either pose or face landmarks are missing.
+    Returns None when either pose or face landmarks are missing.
     """
-    if results.pose_landmarks is None or results.face_landmarks is None:
+    if not pose_result.pose_landmarks or not face_result.face_landmarks:
         return None
 
-    pose = results.pose_landmarks.landmark
+    pose_landmarks = pose_result.pose_landmarks[0]  # first person
+    face_landmarks = face_result.face_landmarks[0]  # first face
+
+    if len(pose_landmarks) < _POSE_LANDMARK_COUNT:
+        return None
+    if len(face_landmarks) < _OLD_FACE_LANDMARK_COUNT:
+        return None
+
+    #pose: 33 landmarks x [x, y, z, visibility]
     pose_row = np.array(
-        [[lm.x, lm.y, lm.z, lm.visibility] for lm in pose],
+        [[lm.x, lm.y, lm.z, lm.visibility] for lm in pose_landmarks[:_POSE_LANDMARK_COUNT]],
         dtype=np.float32,
     ).flatten()
 
-    face = results.face_landmarks.landmark
+    #face: 468 landmarks x [x, y, z, visibility]
+    # new API has no visibility, so we default it to 0.0 (as the old API did for face)
     face_row = np.array(
-        [[lm.x, lm.y, lm.z, lm.visibility] for lm in face],
+        [[lm.x, lm.y, lm.z, 0.0] for lm in face_landmarks[:_OLD_FACE_LANDMARK_COUNT]],
         dtype=np.float32,
     ).flatten()
 
     return np.concatenate([pose_row, face_row])
 
 
-#tensorflow inference helper
+#TFLite inference helper
 class EmotionClassifier:
-    """Thin wrapper around a TF interpreter for emotion prediction"""
+    """Thin wrapper around a TFLite interpreter for emotion prediction."""
 
     def __init__(self, model_path: str):
         self.interpreter = _Interpreter(model_path=model_path)
@@ -129,7 +167,7 @@ class EmotionClassifier:
 
     def predict(self, features: np.ndarray):
         """
-        Run inference on a 1D feature vector
+        Run inference on a 1D feature vector.
 
         Returns
         -------
@@ -138,7 +176,6 @@ class EmotionClassifier:
         probabilities : np.ndarray
             Softmax probability array over all classes.
         """
-        #ensure correct shape and dtype
         input_data = features.astype(np.float32).reshape(
             self._input_details[0]["shape"]
         )
@@ -188,6 +225,8 @@ def run_analysis(video_path: str, model_path: str = None) -> dict:
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
+    _ensure_models()
+
     classifier = EmotionClassifier(model_path)
     warnings.filterwarnings("ignore")
 
@@ -197,19 +236,24 @@ def run_analysis(video_path: str, model_path: str = None) -> dict:
     frames = []
     frame_idx = 0
 
-    with mp_holistic.Holistic(
-        min_detection_confidence=0.5, min_tracking_confidence=0.5
-    ) as holistic:
+    pose_landmarker = _create_pose_landmarker()
+    face_landmarker = _create_face_landmarker()
+
+    try:
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image.flags.writeable = False
-            results = holistic.process(image)
+            timestamp_ms = int(frame_idx * 1000 / fps)
 
-            row = extract_landmarks(results)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
+
+            pose_result = pose_landmarker.detect_for_video(mp_image, timestamp_ms)
+            face_result = face_landmarker.detect_for_video(mp_image, timestamp_ms)
+
+            row = extract_landmarks(pose_result, face_result)
             if row is not None:
                 emotion, probs = classifier.predict(row)
                 confidence = float(probs[int(np.argmax(probs))])
@@ -220,10 +264,12 @@ def run_analysis(video_path: str, model_path: str = None) -> dict:
                 })
 
             frame_idx += 1
+    finally:
+        pose_landmarker.close()
+        face_landmarker.close()
+        cap.release()
 
-    cap.release()
-
-    # Build summary
+    #build summary
     total = len(frames)
     duration = frame_idx / fps if fps > 0 else 0.0
 
@@ -251,46 +297,23 @@ def run_analysis(video_path: str, model_path: str = None) -> dict:
     }
 
 
-#overlay helpers #TODO:delete later
-def draw_prediction_overlay(image, body_language_class, body_language_prob, results):
-  
+def draw_landmarks(image, pose_result, face_result):
+    """Draw pose landmarks on the frame using OpenCV (simplified viz)."""
     h, w, _ = image.shape
 
-    # Label near the left ear
-    coords = tuple(
-        np.multiply(
-            np.array(
-                (
-                    results.pose_landmarks.landmark[
-                        mp_holistic.PoseLandmark.LEFT_EAR
-                    ].x,
-                    results.pose_landmarks.landmark[
-                        mp_holistic.PoseLandmark.LEFT_EAR
-                    ].y,
-                )
-            ),
-            [w, h],
-        ).astype(int)
-    )
+    if pose_result.pose_landmarks:
+        for lm in pose_result.pose_landmarks[0]:
+            cx, cy = int(lm.x * w), int(lm.y * h)
+            cv2.circle(image, (cx, cy), 4, (245, 117, 66), -1)
 
-    cv2.rectangle(
-        image,
-        (coords[0], coords[1] + 5),
-        (coords[0] + len(body_language_class) * 20, coords[1] - 30),
-        (245, 117, 16),
-        -1,
-    )
-    cv2.putText(
-        image,
-        body_language_class,
-        coords,
-        cv2.FONT_HERSHEY_SIMPLEX,
-        1,
-        (255, 255, 255),
-        2,
-        cv2.LINE_AA,
-    )
+    if face_result.face_landmarks:
+        for lm in face_result.face_landmarks[0][:_OLD_FACE_LANDMARK_COUNT]:
+            cx, cy = int(lm.x * w), int(lm.y * h)
+            cv2.circle(image, (cx, cy), 1, (80, 256, 121), -1)
 
+
+def draw_prediction_overlay(image, body_language_class, body_language_prob):
+    """Draw the predicted class + probability overlay on the frame."""
     cv2.rectangle(image, (0, 0), (250, 60), (245, 117, 16), -1)
 
     cv2.putText(
@@ -336,63 +359,67 @@ def draw_prediction_overlay(image, body_language_class, body_language_prob, resu
     )
 
 
-
 def run_detection(model_path: str, video_path: str):
+    """Interactive detection with OpenCV GUI display."""
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
     if not os.path.isfile(model_path):
         raise FileNotFoundError(f"Model file not found: {model_path}")
 
-    classifier = EmotionClassifier(model_path)
+    _ensure_models()
 
+    classifier = EmotionClassifier(model_path)
     warnings.filterwarnings("ignore")
 
     cap = cv2.VideoCapture(video_path)
+    fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
-    with mp_holistic.Holistic(
-        min_detection_confidence=0.5, min_tracking_confidence=0.5
-    ) as holistic:
+    pose_landmarker = _create_pose_landmarker()
+    face_landmarker = _create_face_landmarker()
+
+    frame_idx = 0
+
+    try:
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
 
-            #(BGR -> RGB)
-            image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            image.flags.writeable = False
+            timestamp_ms = int(frame_idx * 1000 / fps)
 
-            results = holistic.process(image)
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
-            #recolor back to BGR for rendering
-            image.flags.writeable = True
-            image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
+            pose_result = pose_landmarker.detect_for_video(mp_image, timestamp_ms)
+            face_result = face_landmarker.detect_for_video(mp_image, timestamp_ms)
 
-            draw_landmarks(image, results)
+            #draw landmarks
+            draw_landmarks(frame, pose_result, face_result)
 
             try:
-                row = extract_landmarks(results)
+                row = extract_landmarks(pose_result, face_result)
                 if row is not None:
                     body_language_class, body_language_prob = classifier.predict(row)
-
-                    draw_prediction_overlay(
-                        image, body_language_class, body_language_prob, results
-                    )
+                    draw_prediction_overlay(frame, body_language_class, body_language_prob)
             except Exception:
                 pass
 
-            cv2.imshow("Body Language Detection", image)
+            cv2.imshow("Body Language Detection", frame)
 
             if cv2.waitKey(10) & 0xFF == ord("q"):
                 break
 
-    cap.release()
-    cv2.destroyAllWindows()
-
+            frame_idx += 1
+    finally:
+        pose_landmarker.close()
+        face_landmarker.close()
+        cap.release()
+        cv2.destroyAllWindows()
 
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Body language detection from a video file using MediaPipe + TFLite."
+        description="Body language detection from a video file using MediaPipe Tasks + TFLite."
     )
     parser.add_argument(
         "--video",
