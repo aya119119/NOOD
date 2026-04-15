@@ -158,6 +158,14 @@ EMOTION_FEEDBACK = {
 #model loaders
 _vad_model = None
 _asr_model = None
+"""
+from speechbrain.pretrained import EncoderDecoderASR
+_asr_model = EncoderDecoderASR.from_hparams(
+        source="../pretrained_models/asr/",
+        savedir="../tmp",
+        run_opts={"device":"cuda"}
+        )
+"""
 _emotion_model = None
  
  
@@ -179,8 +187,9 @@ def load_asr():
         from speechbrain.pretrained import EncoderDecoderASR
         print("  Loading ASR model…", flush=True)
         _asr_model = EncoderDecoderASR.from_hparams(
-            source="speechbrain/asr-wav2vec2-commonvoice-en",
-            savedir="pretrained_models/asr",
+            source="speechbrain/asr-crdnn-rnnlm-librispeech",
+            savedir="pretrained_models/asr2",
+            run_opts={"device": "cuda"},
         )
     return _asr_model
  
