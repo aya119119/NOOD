@@ -13,7 +13,9 @@ Takes the output of speech_analyzer.py (SpeechReport) and asks an LLM to:
   3. Flag specific mismatches (e.g. cheerful delivery during a eulogy).
   4. Return prioritised, actionable coaching tips.
  
-Uses the Pollinations AI text API — no API key required.
+Uses the Pollinations AI text API with API key authentication.
+  Requires the POLLINATIONS_API_KEY environment variable to be set.
+  Falls back to GET requests if POST requests fail.
   Endpoint: https://text.pollinations.ai/
   Docs:     https://github.com/pollinations/pollinations
  
@@ -33,9 +35,11 @@ Usage (programmatic):
  
 import argparse
 import json
+import os
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass, asdict, field
 from typing import Optional
@@ -162,15 +166,21 @@ Analyze the tone-content appropriateness and return JSON as specified."""
 # Pollinations API call
 # ──────────────────────────────────────────────────────────────────────────────
  
-def call_pollinations(
+def _get_api_key() -> str:
+    """Retrieve the Pollinations API key from the environment."""
+    key = os.environ.get("POLLINATIONS_API_KEY", "")
+    if not key:
+        print("  [Pollinations] WARNING: POLLINATIONS_API_KEY not set.", flush=True)
+    return key
+
+
+def _call_post(
     user_message: str,
-    model: str = DEFAULT_MODEL,
-    seed: int = 42,
+    model: str,
+    seed: int,
+    api_key: str,
 ) -> str:
-    """
-    Calls the Pollinations text API and returns the raw response string.
-    Retries on transient failures.
-    """
+    """Attempt a POST request to the Pollinations text API."""
     payload = json.dumps({
         "model": model,
         "messages": [
@@ -178,41 +188,107 @@ def call_pollinations(
         ],
         "system": SYSTEM_PROMPT,
         "seed": seed,
-        "json_mode": True,      # instructs the model to return valid JSON
-        "temperature": 0.3,     # low temperature for consistent structured output
+        "json_mode": True,
+        "temperature": 0.3,
     }).encode("utf-8")
- 
+
     headers = {
         "Content-Type": "application/json",
         "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     }
- 
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    req = urllib.request.Request(
+        POLLINATIONS_URL,
+        data=payload,
+        headers=headers,
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+        return resp.read().decode("utf-8")
+
+
+def _call_get(
+    user_message: str,
+    model: str,
+    seed: int,
+    api_key: str,
+) -> str:
+    """Fallback: use a GET request to the Pollinations text API."""
+    # Build a combined prompt that includes the system instruction
+    combined_prompt = f"{SYSTEM_PROMPT}\n\n{user_message}"
+
+    params = urllib.parse.urlencode({
+        "model": model,
+        "seed": seed,
+        "json_mode": "true",
+        "temperature": "0.3",
+    })
+    encoded_prompt = urllib.parse.quote(combined_prompt, safe="")
+    url = f"{POLLINATIONS_URL}{encoded_prompt}?{params}"
+
+    headers = {
+        "Accept": "application/json",
+        "User-Agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    }
+    if api_key:
+        headers["Authorization"] = f"Bearer {api_key}"
+
+    req = urllib.request.Request(url, headers=headers, method="GET")
+    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
+        return resp.read().decode("utf-8")
+
+
+def call_pollinations(
+    user_message: str,
+    model: str = DEFAULT_MODEL,
+    seed: int = 42,
+) -> str:
+    """
+    Calls the Pollinations text API and returns the raw response string.
+    Tries POST first; if POST fails, falls back to GET.
+    Retries on transient failures.
+    """
+    api_key = _get_api_key()
+    post_failed = False
+
     last_error = None
     for attempt in range(1, MAX_RETRIES + 1):
+        # ── Try POST first (unless a previous POST got a terminal auth error) ──
+        if not post_failed:
+            try:
+                print(f"  [Pollinations] POST attempt {attempt}/{MAX_RETRIES}…", flush=True)
+                return _call_post(user_message, model, seed, api_key)
+            except urllib.error.HTTPError as e:
+                last_error = f"POST HTTP {e.code}: {e.reason}"
+                print(f"  [Pollinations] {last_error}", flush=True)
+                if e.code in (401, 403, 405):
+                    # Auth or method-not-allowed → switch to GET for this + future attempts
+                    post_failed = True
+                    print("  [Pollinations] Switching to GET fallback.", flush=True)
+            except (urllib.error.URLError, TimeoutError) as e:
+                last_error = f"POST error: {e}"
+                print(f"  [Pollinations] {last_error}", flush=True)
+
+        # ── GET fallback ──
         try:
-            req = urllib.request.Request(
-                POLLINATIONS_URL,
-                data=payload,
-                headers=headers,
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-                raw = resp.read().decode("utf-8")
-                return raw
- 
+            print(f"  [Pollinations] GET attempt {attempt}/{MAX_RETRIES}…", flush=True)
+            return _call_get(user_message, model, seed, api_key)
         except urllib.error.HTTPError as e:
-            last_error = f"HTTP {e.code}: {e.reason}"
-            print(f"  [Pollinations] Attempt {attempt}/{MAX_RETRIES} failed: {last_error}", flush=True)
+            last_error = f"GET HTTP {e.code}: {e.reason}"
+            print(f"  [Pollinations] {last_error}", flush=True)
         except urllib.error.URLError as e:
-            last_error = f"URLError: {e.reason}"
-            print(f"  [Pollinations] Attempt {attempt}/{MAX_RETRIES} failed: {last_error}", flush=True)
+            last_error = f"GET URLError: {e.reason}"
+            print(f"  [Pollinations] {last_error}", flush=True)
         except TimeoutError:
-            last_error = "Request timed out"
-            print(f"  [Pollinations] Attempt {attempt}/{MAX_RETRIES} timed out.", flush=True)
- 
+            last_error = "GET request timed out"
+            print(f"  [Pollinations] {last_error}", flush=True)
+
         if attempt < MAX_RETRIES:
             time.sleep(RETRY_DELAY)
- 
+
     raise RuntimeError(f"Pollinations API failed after {MAX_RETRIES} attempts. Last error: {last_error}")
  
  

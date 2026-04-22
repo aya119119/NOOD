@@ -1,6 +1,3 @@
-"""prompt: Comment on this file with an explanation"""
-
-
 """
 ---------------------------------------------------------------------------
 Pipeline:
@@ -43,27 +40,50 @@ from datetime import datetime
 from pathlib import Path
 
 
-#path setup
+# ─── Path setup ──────────────────────────────────────────────────────────────
+
 _PROJECT_ROOT = Path(__file__).resolve().parent
 _BODY_DIR = _PROJECT_ROOT / "Body Analysis"
 _SPEECH_DIR = _PROJECT_ROOT / "Speech Analysis"
+_TMP_DIR = _PROJECT_ROOT / "tmp" / "audio"
 
 sys.path.insert(0, str(_BODY_DIR))
 sys.path.insert(0, str(_SPEECH_DIR))
 
+# Ensure tmp directory exists
+_TMP_DIR.mkdir(parents=True, exist_ok=True)
+
+
+# ─── Timing utility ─────────────────────────────────────────────────────────
+
+class PipelineTimer:
+    """Collects named stage timings into a dict."""
+
+    def __init__(self):
+        self._timings = {}
+        self._starts = {}
+
+    def start(self, name: str):
+        self._starts[name] = time.time()
+
+    def stop(self, name: str):
+        if name in self._starts:
+            self._timings[name] = round(time.time() - self._starts.pop(name), 3)
+
+    def record(self, name: str, value: float):
+        self._timings[name] = round(value, 3)
+
+    @property
+    def timings(self) -> dict:
+        return dict(self._timings)
+
+
+# ─── Audio extraction ───────────────────────────────────────────────────────
 
 def extract_audio(video_path: str, output_path: str) -> str:
     """
-      a video file to WAV using ffmpeg.
-
-    
-    ----------
-    video_path  : path to the input video
-    output_path : desired path for the output .wav file
-
-    Returns
-    -------
-    str : absolute path to the extracted audio file
+    Extract audio from a video file to WAV using ffmpeg.
+    Output is 16 kHz, mono, 16-bit PCM — directly usable by SpeechBrain.
     """
     cmd = [
         "ffmpeg",
@@ -90,7 +110,8 @@ def extract_audio(video_path: str, output_path: str) -> str:
     return os.path.abspath(output_path)
 
 
-#worker functions (one per thread)
+# ─── Worker functions ────────────────────────────────────────────────────────
+
 def _run_body_analysis(video_path: str) -> dict:
     """Thread A: body language detection on the raw video."""
     print("\n══ [Thread A] Body language analysis starting…", flush=True)
@@ -110,20 +131,22 @@ def _run_body_analysis(video_path: str) -> dict:
     return result
 
 
-def _run_speech_and_tone(audio_path: str, segment_duration: int = 0) -> dict:
+def _run_speech_and_tone(audio_context, segment_duration: int = 0) -> dict:
     """
-    Thread B: speech analysis ----> tone analysis (sequential, since tone
+    Thread B: speech analysis --> tone analysis (sequential, since tone
     depends on the speech report).
     """
     print("\n══ [Thread B] Speech analysis starting…", flush=True)
     t0 = time.time()
 
     from speech_analyzer import analyze as speech_analyze, analyze_segments
-    speech_report = speech_analyze(audio_path)
+    speech_report = speech_analyze(audio_context)
 
     if segment_duration > 0:
         print(f"  Running segmented analysis ({segment_duration}s windows)…", flush=True)
-        speech_report.segments = analyze_segments(audio_path, segment_duration)
+        speech_report.segments = analyze_segments(
+            audio_context, segment_duration
+        )
 
     speech_elapsed = time.time() - t0
     print(f"══ [Thread B] Speech done ({speech_elapsed:.1f}s), starting tone analysis…", flush=True)
@@ -140,8 +163,8 @@ def _run_speech_and_tone(audio_path: str, segment_duration: int = 0) -> dict:
     }
 
 
-#Scoring
-#positive emotions for body language scoring
+# ─── Scoring ─────────────────────────────────────────────────────────────────
+
 _POSITIVE_EMOTIONS = {"Happy", "Excited", "Surprised"}
 _NEGATIVE_EMOTIONS = {"Angry", "Sad", "Pain", "Tension"}
 _NEUTRAL_EMOTIONS  = {"Confused"}
@@ -150,10 +173,6 @@ _NEUTRAL_EMOTIONS  = {"Confused"}
 def compute_body_language_score(summary: dict) -> float:
     """
     Convert body language summary into a normalised score (0.0 ----> 1.0).
-
-    Scoring heuristic:
-      - high confidence + positive/neutral emotions → higher score
-      - negative emotions drag score down proportionally
     """
     distribution = summary.get("emotion_distribution", {})
     confidence = summary.get("average_confidence", 0.5)
@@ -174,17 +193,17 @@ def compute_overall_score(
     speech_overall: float,
     body_score: float,
     tone_fit_score: float,
+    speech_emotion_score: float = 0.0,
 ) -> tuple[float, str]:
     """
     Weighted combination → 0–100 score + letter grade.
-
-    Weights:
-        Speech metrics  : 40%
-        Body language   : 30%
-        Tone-content fit: 30%
     """
     # speech_overall is in [-1, 1]; map to [0, 1]
     speech_norm = (speech_overall + 1) / 2.0
+
+    # Context-aware emotion adjustment
+    emotion_context_bonus = speech_emotion_score * tone_fit_score * 0.10
+    speech_norm = max(0.0, min(1.0, speech_norm + emotion_context_bonus))
 
     raw = (
         0.40 * speech_norm +
@@ -207,9 +226,8 @@ def compute_overall_score(
     return score_100, letter
 
 
-# ---------------------------------------------------------------------------
-# Timeline builder
-# ---------------------------------------------------------------------------
+# ─── Timeline builder ───────────────────────────────────────────────────────
+
 def build_timeline(body_frames: list, speech_segments: list) -> list:
     """
     Merges body language per-frame events and speech per-segment events
@@ -245,12 +263,13 @@ def build_timeline(body_frames: list, speech_segments: list) -> list:
             "energy_score": seg.get("energy_score", 0),
         })
 
-    #Sort chronologically
+    # Sort chronologically
     timeline.sort(key=lambda x: x["timestamp_s"])
     return timeline
 
 
-#pretty console summary
+# ─── Pretty console summary ─────────────────────────────────────────────────
+
 def print_summary(report: dict):
     """Print a human-readable overview to the console."""
     sep = "─" * 62
@@ -287,15 +306,28 @@ def print_summary(report: dict):
     if tn.get("coaching_tips"):
         print(f"    Top tip          : {tn['coaching_tips'][0]}")
 
+    # Timings
+    if "timings" in report.get("meta", {}):
+        print(f"\n  ▸ Timings")
+        for k, v in report["meta"]["timings"].items():
+            if isinstance(v, dict):
+                print(f"    {k}:")
+                for sk, sv in v.items():
+                    print(f"      {sk:.<30} {sv:.3f}s")
+            else:
+                print(f"    {k:.<32} {v:.3f}s")
+
     # Timeline count
     print(f"\n  ▸ Timeline: {len(report['timeline'])} events")
     print(f"{'═' * 62}\n")
 
 
+# ─── Main pipeline ──────────────────────────────────────────────────────────
+
 def run_pipeline(
     video_path: str,
     output_path: str = "presentation_report.json",
-    segment_duration: int = 30,
+    segment_duration: int = 0,
 ) -> dict:
     """
     Full pipeline: extract audio → parallel analysis → score → JSON.
@@ -314,79 +346,111 @@ def run_pipeline(
     if not os.path.isfile(video_path):
         raise FileNotFoundError(f"Video file not found: {video_path}")
 
+    timer = PipelineTimer()
+
     print(f"\n{'═' * 62}")
     print(f"  PRESENTATION ANALYZER — pipeline starting")
     print(f"  Video : {video_path}")
     print(f"{'═' * 62}\n")
 
-    t_start = time.time()
+    timer.start("total")
 
-    #extract audio 
+    # ── Extract audio ────────────────────────────────────────────────────
+    timer.start("audio_extraction")
     tmp_audio = tempfile.NamedTemporaryFile(
-        suffix=".wav", prefix="pres_audio_", delete=False
+        suffix=".wav", prefix="pres_audio_", dir=str(_TMP_DIR), delete=False
     ).name
     try:
         audio_path = extract_audio(video_path, tmp_audio)
     except RuntimeError as e:
         print(f"\n  [ERROR] {e}", file=sys.stderr)
         sys.exit(1)
+    timer.stop("audio_extraction")
 
-    #parallel analysis
+    # ── Load audio once ──────────────────────────────────────────────────
+    timer.start("audio_load")
+    from audio_context import AudioContext
+    audio_context = AudioContext.from_wav(audio_path)
+    timer.stop("audio_load")
+
+    # ── Parallel analysis ────────────────────────────────────────────────
     body_result = None
     speech_tone_result = None
 
-    with ThreadPoolExecutor(max_workers=2) as pool:
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        # Body language is CPU-only (MediaPipe + TFLite) — run on thread
+        timer.start("body_analysis")
         future_body = pool.submit(_run_body_analysis, video_path)
-        future_speech_tone = pool.submit(
-            _run_speech_and_tone, audio_path, segment_duration
-        )
 
-        for future in as_completed([future_body, future_speech_tone]):
-            try:
-                result = future.result()
-                if future is future_body:
-                    body_result = result
-                else:
-                    speech_tone_result = result
-            except Exception as e:
-                print(f"\n  [ERROR] Analyzer failed: {e}", file=sys.stderr)
-                import traceback
-                traceback.print_exc()
+        # Speech + tone uses GPU (SpeechBrain) — run on main thread
+        timer.start("speech_tone_analysis")
+        try:
+            speech_tone_result = _run_speech_and_tone(audio_context, segment_duration)
+        except Exception as e:
+            print(f"\n  [ERROR] Speech/tone analyzer failed: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+        timer.stop("speech_tone_analysis")
 
-    # Clean up temp audio
+        # Collect body result
+        try:
+            body_result = future_body.result()
+        except Exception as e:
+            print(f"\n  [ERROR] Body analyzer failed: {e}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+        timer.stop("body_analysis")
+
+    # ── Clean up temp files ──────────────────────────────────────────────
     Path(tmp_audio).unlink(missing_ok=True)
+    audio_context.cleanup()
 
     if body_result is None or speech_tone_result is None:
         print("\n  [FATAL] One or more analyzers failed. Cannot produce report.",
               file=sys.stderr)
         sys.exit(1)
 
-    #scoring
+    # ── Scoring ──────────────────────────────────────────────────────────
     body_score = compute_body_language_score(body_result["summary"])
     speech_overall = speech_tone_result["speech"]["overall"]
     tone_fit_score = speech_tone_result["tone"]["tone_fit_score"]
+    speech_emotion_score = speech_tone_result["speech"].get(
+        "vocal_emotion", {}
+    ).get("score", 0.0)
 
     overall_score, overall_grade = compute_overall_score(
-        speech_overall, body_score, tone_fit_score
+        speech_overall, body_score, tone_fit_score,
+        speech_emotion_score=speech_emotion_score,
     )
 
-    #timeline
+    # ── Timeline ─────────────────────────────────────────────────────────
     timeline = build_timeline(
         body_result.get("frames", []),
         speech_tone_result["speech"].get("segments", []),
     )
 
-    #assemble report
-    # Strip the raw LLM response to keep JSON size reasonable
+    # ── Assemble report ──────────────────────────────────────────────────
     tone_data = speech_tone_result["tone"]
     tone_data.pop("raw_response", None)
+
+    timer.stop("total")
+
+    # Merge speech-level timings into pipeline timings
+    pipeline_timings = timer.timings
+    speech_timings = speech_tone_result["speech"].get("timings", {})
+    if speech_timings:
+        pipeline_timings["speech_detail"] = speech_timings
 
     report = {
         "meta": {
             "video": video_path,
             "generated_at": datetime.now().isoformat(),
-            "pipeline_duration_s": round(time.time() - t_start, 2),
+            "pipeline_duration_s": pipeline_timings.get("total", 0),
             "segment_duration": segment_duration,
+            "process_id": os.getpid(),
+            "cold_start": True,       # will be False in service mode
+            "audio_duration_s": round(audio_context.duration_s, 2),
+            "timings": pipeline_timings,
         },
         "overall_score": overall_score,
         "overall_grade": overall_grade,
@@ -402,7 +466,7 @@ def run_pipeline(
         "timeline": timeline,
     }
 
-    #write output
+    # ── Write output ─────────────────────────────────────────────────────
     with open(output_path, "w") as f:
         json.dump(report, f, indent=2, ensure_ascii=False)
 
@@ -431,9 +495,9 @@ def main():
     parser.add_argument(
         "--segment-duration",
         type=int,
-        default=30,
+        default=0,
         metavar="SECS",
-        help="Per-segment analysis window in seconds (default: 30, 0 to disable)",
+        help="Per-segment analysis window in seconds (default: 0 = disabled)",
     )
     args = parser.parse_args()
 

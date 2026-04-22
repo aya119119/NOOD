@@ -96,9 +96,12 @@ def _ensure_models():
 
 
 def _create_pose_landmarker() -> PoseLandmarker:
-    """Create a PoseLandmarker in VIDEO mode."""
+    """Create a PoseLandmarker in VIDEO mode, forced to CPU."""
     options = PoseLandmarkerOptions(
-        base_options=BaseOptions(model_asset_path=str(_POSE_MODEL_PATH)),
+        base_options=BaseOptions(
+            model_asset_path=str(_POSE_MODEL_PATH),
+            delegate=BaseOptions.Delegate.CPU,
+        ),
         running_mode=VisionRunningMode.VIDEO,
         num_poses=1,
         min_pose_detection_confidence=0.5,
@@ -108,9 +111,12 @@ def _create_pose_landmarker() -> PoseLandmarker:
 
 
 def _create_face_landmarker() -> FaceLandmarker:
-    """Create a FaceLandmarker in VIDEO mode."""
+    """Create a FaceLandmarker in VIDEO mode, forced to CPU."""
     options = FaceLandmarkerOptions(
-        base_options=BaseOptions(model_asset_path=str(_FACE_MODEL_PATH)),
+        base_options=BaseOptions(
+            model_asset_path=str(_FACE_MODEL_PATH),
+            delegate=BaseOptions.Delegate.CPU,
+        ),
         running_mode=VisionRunningMode.VIDEO,
         num_faces=1,
         min_face_detection_confidence=0.5,
@@ -158,12 +164,29 @@ def extract_landmarks(pose_result, face_result) -> np.ndarray | None:
 class EmotionClassifier:
     """Thin wrapper around a TFLite interpreter for emotion prediction."""
 
+    BATCH_SIZE = 32  # accumulation batch size for predict_batch
+
     def __init__(self, model_path: str):
         self.interpreter = _Interpreter(model_path=model_path)
         self.interpreter.allocate_tensors()
 
         self._input_details = self.interpreter.get_input_details()
         self._output_details = self.interpreter.get_output_details()
+
+        # Check if TFLite model supports dynamic batch resizing
+        self._supports_batch = False
+        try:
+            test_shape = list(self._input_details[0]["shape"])
+            test_shape[0] = 2  # try batch=2
+            self.interpreter.resize_tensor_input(self._input_details[0]["index"], test_shape)
+            self.interpreter.allocate_tensors()
+            self._supports_batch = True
+            # Reset back to batch=1
+            test_shape[0] = 1
+            self.interpreter.resize_tensor_input(self._input_details[0]["index"], test_shape)
+            self.interpreter.allocate_tensors()
+        except Exception:
+            self._supports_batch = False
 
     def predict(self, features: np.ndarray):
         """
@@ -189,6 +212,66 @@ class EmotionClassifier:
         class_idx = int(np.argmax(probabilities))
         class_name = CLASS_NAMES[class_idx] if class_idx < len(CLASS_NAMES) else str(class_idx)
         return class_name, probabilities
+
+    def predict_batch(self, features_list: list):
+        """
+        Run inference on a list of 1D feature vectors.
+        Attempts true batched inference; falls back to sequential if TFLite
+        model doesn't support dynamic batch sizes.
+
+        Returns
+        -------
+        list of (class_name, probabilities) tuples
+        """
+        if not features_list:
+            return []
+
+        batch_size = len(features_list)
+
+        if self._supports_batch and batch_size > 1:
+            try:
+                return self._predict_batch_native(features_list, batch_size)
+            except Exception:
+                # Fall back to sequential on any error
+                pass
+
+        # Fallback: sequential inference (still benefits from reduced
+        # Python overhead via pre-collected batch)
+        return [self.predict(f) for f in features_list]
+
+    def _predict_batch_native(self, features_list, batch_size):
+        """True batched TFLite inference."""
+        input_shape = list(self._input_details[0]["shape"])
+        input_shape[0] = batch_size
+        self.interpreter.resize_tensor_input(
+            self._input_details[0]["index"], input_shape
+        )
+        self.interpreter.allocate_tensors()
+
+        batch_data = np.stack(
+            [f.astype(np.float32) for f in features_list], axis=0
+        ).reshape(input_shape)
+
+        self.interpreter.set_tensor(self._input_details[0]["index"], batch_data)
+        self.interpreter.invoke()
+        all_probs = self.interpreter.get_tensor(
+            self._output_details[0]["index"]
+        )
+
+        results = []
+        for probs in all_probs:
+            class_idx = int(np.argmax(probs))
+            class_name = CLASS_NAMES[class_idx] if class_idx < len(CLASS_NAMES) else str(class_idx)
+            results.append((class_name, probs))
+
+        # Reset to batch=1 for future single predictions
+        input_shape[0] = 1
+        self.interpreter.resize_tensor_input(
+            self._input_details[0]["index"], input_shape
+        )
+        self.interpreter.allocate_tensors()
+
+        return results
 
 
 def run_analysis(video_path: str, model_path: str = None) -> dict:
@@ -233,17 +316,30 @@ def run_analysis(video_path: str, model_path: str = None) -> dict:
     cap = cv2.VideoCapture(video_path)
     fps = cap.get(cv2.CAP_PROP_FPS) or 30.0
 
+    # Downsample to ~5 FPS to reduce processing load
+    FRAME_SKIP = max(1, int(fps / 5))
+    BATCH_SIZE = EmotionClassifier.BATCH_SIZE
+
     frames = []
     frame_idx = 0
 
     pose_landmarker = _create_pose_landmarker()
     face_landmarker = _create_face_landmarker()
 
+    # Batch accumulation buffers
+    batch_rows = []
+    batch_meta = []  # (timestamp_s,) per row
+
     try:
         while cap.isOpened():
             ret, frame = cap.read()
             if not ret:
                 break
+
+            # Skip frames for ~5 FPS processing
+            if frame_idx % FRAME_SKIP != 0:
+                frame_idx += 1
+                continue
 
             timestamp_ms = int(frame_idx * 1000 / fps)
 
@@ -255,15 +351,34 @@ def run_analysis(video_path: str, model_path: str = None) -> dict:
 
             row = extract_landmarks(pose_result, face_result)
             if row is not None:
-                emotion, probs = classifier.predict(row)
+                batch_rows.append(row)
+                batch_meta.append(round(frame_idx / fps, 3))
+
+            # Flush batch when full
+            if len(batch_rows) >= BATCH_SIZE:
+                results = classifier.predict_batch(batch_rows)
+                for (emotion, probs), ts in zip(results, batch_meta):
+                    confidence = float(probs[int(np.argmax(probs))])
+                    frames.append({
+                        "timestamp_s": ts,
+                        "emotion": emotion,
+                        "confidence": round(confidence, 4),
+                    })
+                batch_rows.clear()
+                batch_meta.clear()
+
+            frame_idx += 1
+
+        # Flush remaining batch
+        if batch_rows:
+            results = classifier.predict_batch(batch_rows)
+            for (emotion, probs), ts in zip(results, batch_meta):
                 confidence = float(probs[int(np.argmax(probs))])
                 frames.append({
-                    "timestamp_s": round(frame_idx / fps, 3),
+                    "timestamp_s": ts,
                     "emotion": emotion,
                     "confidence": round(confidence, 4),
                 })
-
-            frame_idx += 1
     finally:
         pose_landmarker.close()
         face_landmarker.close()
