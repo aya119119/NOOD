@@ -1,0 +1,756 @@
+{
+  "meta": {
+    "video": "/mnt/c/Users/lain/Documents/test_video.mp4",
+    "generated_at": "2026-04-22T16:40:16.413160",
+    "pipeline_duration_s": 167.442,
+    "segment_duration": 0,
+    "process_id": 360971,
+    "cold_start": true,
+    "audio_duration_s": 273.79,
+    "timings": {
+      "audio_extraction": 0.921,
+      "audio_load": 1.272,
+      "speech_tone_analysis": 165.238,
+      "body_analysis": 165.238,
+      "total": 167.442,
+      "speech_detail": {
+        "vad_load": 2.574,
+        "vad_inference": 6.591,
+        "asr_load": 4.258,
+        "asr_inference": 19.406,
+        "asr_chunks": 20,
+        "prosody_inference": 28.641,
+        "emotion_load": 2.362,
+        "emotion_inference": 81.852,
+        "total_speech_analysis": 145.837
+      }
+    }
+  },
+  "overall_score": 34.5,
+  "overall_grade": "F",
+  "component_scores": {
+    "speech_score": 53.8,
+    "body_language_score": 20.7,
+    "tone_fit_score": 25.0
+  },
+  "body_language_score": 0.2073,
+  "body_language": {
+    "frames": [
+      {
+        "timestamp_s": 125.0,
+        "emotion": "Happy",
+        "confidence": 0.5112
+      },
+      {
+        "timestamp_s": 133.6,
+        "emotion": "Happy",
+        "confidence": 0.8136
+      },
+      {
+        "timestamp_s": 133.8,
+        "emotion": "Happy",
+        "confidence": 0.8003
+      },
+      {
+        "timestamp_s": 134.0,
+        "emotion": "Happy",
+        "confidence": 0.7677
+      },
+      {
+        "timestamp_s": 134.2,
+        "emotion": "Happy",
+        "confidence": 0.7359
+      },
+      {
+        "timestamp_s": 134.4,
+        "emotion": "Happy",
+        "confidence": 0.7684
+      },
+      {
+        "timestamp_s": 134.6,
+        "emotion": "Happy",
+        "confidence": 0.7801
+      },
+      {
+        "timestamp_s": 134.8,
+        "emotion": "Happy",
+        "confidence": 0.7383
+      },
+      {
+        "timestamp_s": 178.6,
+        "emotion": "Happy",
+        "confidence": 0.6331
+      },
+      {
+        "timestamp_s": 178.8,
+        "emotion": "Happy",
+        "confidence": 0.6629
+      },
+      {
+        "timestamp_s": 179.0,
+        "emotion": "Happy",
+        "confidence": 0.7013
+      },
+      {
+        "timestamp_s": 216.4,
+        "emotion": "Sad",
+        "confidence": 0.9918
+      },
+      {
+        "timestamp_s": 216.6,
+        "emotion": "Sad",
+        "confidence": 0.9919
+      },
+      {
+        "timestamp_s": 216.8,
+        "emotion": "Sad",
+        "confidence": 0.9948
+      },
+      {
+        "timestamp_s": 217.0,
+        "emotion": "Sad",
+        "confidence": 0.9876
+      },
+      {
+        "timestamp_s": 217.2,
+        "emotion": "Sad",
+        "confidence": 0.8826
+      },
+      {
+        "timestamp_s": 217.4,
+        "emotion": "Sad",
+        "confidence": 0.8377
+      },
+      {
+        "timestamp_s": 217.6,
+        "emotion": "Sad",
+        "confidence": 0.8073
+      },
+      {
+        "timestamp_s": 217.8,
+        "emotion": "Sad",
+        "confidence": 0.7299
+      },
+      {
+        "timestamp_s": 218.0,
+        "emotion": "Sad",
+        "confidence": 0.8945
+      },
+      {
+        "timestamp_s": 218.2,
+        "emotion": "Sad",
+        "confidence": 0.9318
+      },
+      {
+        "timestamp_s": 226.8,
+        "emotion": "Sad",
+        "confidence": 0.9651
+      },
+      {
+        "timestamp_s": 227.0,
+        "emotion": "Sad",
+        "confidence": 0.9675
+      },
+      {
+        "timestamp_s": 227.2,
+        "emotion": "Sad",
+        "confidence": 0.982
+      },
+      {
+        "timestamp_s": 227.4,
+        "emotion": "Sad",
+        "confidence": 0.9973
+      },
+      {
+        "timestamp_s": 227.6,
+        "emotion": "Sad",
+        "confidence": 0.9975
+      },
+      {
+        "timestamp_s": 227.8,
+        "emotion": "Sad",
+        "confidence": 0.9619
+      },
+      {
+        "timestamp_s": 228.0,
+        "emotion": "Sad",
+        "confidence": 0.938
+      },
+      {
+        "timestamp_s": 232.6,
+        "emotion": "Sad",
+        "confidence": 0.9995
+      },
+      {
+        "timestamp_s": 232.8,
+        "emotion": "Sad",
+        "confidence": 0.9983
+      },
+      {
+        "timestamp_s": 233.0,
+        "emotion": "Sad",
+        "confidence": 0.9964
+      },
+      {
+        "timestamp_s": 237.6,
+        "emotion": "Sad",
+        "confidence": 0.9689
+      },
+      {
+        "timestamp_s": 237.8,
+        "emotion": "Sad",
+        "confidence": 0.947
+      },
+      {
+        "timestamp_s": 238.0,
+        "emotion": "Sad",
+        "confidence": 0.9655
+      },
+      {
+        "timestamp_s": 238.2,
+        "emotion": "Sad",
+        "confidence": 0.9498
+      },
+      {
+        "timestamp_s": 238.4,
+        "emotion": "Sad",
+        "confidence": 0.9547
+      },
+      {
+        "timestamp_s": 238.6,
+        "emotion": "Sad",
+        "confidence": 0.9732
+      },
+      {
+        "timestamp_s": 238.8,
+        "emotion": "Sad",
+        "confidence": 0.9877
+      },
+      {
+        "timestamp_s": 239.0,
+        "emotion": "Sad",
+        "confidence": 0.989
+      },
+      {
+        "timestamp_s": 239.2,
+        "emotion": "Sad",
+        "confidence": 0.9965
+      },
+      {
+        "timestamp_s": 239.4,
+        "emotion": "Sad",
+        "confidence": 0.9817
+      },
+      {
+        "timestamp_s": 239.6,
+        "emotion": "Sad",
+        "confidence": 0.9779
+      },
+      {
+        "timestamp_s": 239.8,
+        "emotion": "Sad",
+        "confidence": 0.9801
+      },
+      {
+        "timestamp_s": 240.0,
+        "emotion": "Sad",
+        "confidence": 0.9763
+      },
+      {
+        "timestamp_s": 248.8,
+        "emotion": "Sad",
+        "confidence": 0.5986
+      },
+      {
+        "timestamp_s": 249.0,
+        "emotion": "Sad",
+        "confidence": 0.6487
+      },
+      {
+        "timestamp_s": 249.2,
+        "emotion": "Sad",
+        "confidence": 0.7182
+      },
+      {
+        "timestamp_s": 249.4,
+        "emotion": "Sad",
+        "confidence": 0.6346
+      },
+      {
+        "timestamp_s": 249.6,
+        "emotion": "Sad",
+        "confidence": 0.6469
+      },
+      {
+        "timestamp_s": 249.8,
+        "emotion": "Sad",
+        "confidence": 0.5196
+      },
+      {
+        "timestamp_s": 250.0,
+        "emotion": "Sad",
+        "confidence": 0.6058
+      },
+      {
+        "timestamp_s": 250.2,
+        "emotion": "Sad",
+        "confidence": 0.5766
+      },
+      {
+        "timestamp_s": 250.4,
+        "emotion": "Sad",
+        "confidence": 0.564
+      },
+      {
+        "timestamp_s": 250.6,
+        "emotion": "Sad",
+        "confidence": 0.6075
+      },
+      {
+        "timestamp_s": 250.8,
+        "emotion": "Sad",
+        "confidence": 0.6054
+      },
+      {
+        "timestamp_s": 265.6,
+        "emotion": "Happy",
+        "confidence": 0.4094
+      },
+      {
+        "timestamp_s": 265.8,
+        "emotion": "Happy",
+        "confidence": 0.8278
+      },
+      {
+        "timestamp_s": 266.0,
+        "emotion": "Happy",
+        "confidence": 0.916
+      },
+      {
+        "timestamp_s": 266.2,
+        "emotion": "Happy",
+        "confidence": 0.9269
+      },
+      {
+        "timestamp_s": 266.4,
+        "emotion": "Happy",
+        "confidence": 0.9256
+      },
+      {
+        "timestamp_s": 266.6,
+        "emotion": "Happy",
+        "confidence": 0.9175
+      },
+      {
+        "timestamp_s": 266.8,
+        "emotion": "Happy",
+        "confidence": 0.9084
+      },
+      {
+        "timestamp_s": 267.0,
+        "emotion": "Happy",
+        "confidence": 0.9256
+      },
+      {
+        "timestamp_s": 267.2,
+        "emotion": "Happy",
+        "confidence": 0.9276
+      },
+      {
+        "timestamp_s": 267.4,
+        "emotion": "Happy",
+        "confidence": 0.9256
+      },
+      {
+        "timestamp_s": 267.6,
+        "emotion": "Happy",
+        "confidence": 0.9199
+      },
+      {
+        "timestamp_s": 267.8,
+        "emotion": "Happy",
+        "confidence": 0.9235
+      },
+      {
+        "timestamp_s": 268.0,
+        "emotion": "Happy",
+        "confidence": 0.9176
+      },
+      {
+        "timestamp_s": 268.2,
+        "emotion": "Happy",
+        "confidence": 0.9101
+      },
+      {
+        "timestamp_s": 268.4,
+        "emotion": "Happy",
+        "confidence": 0.9003
+      },
+      {
+        "timestamp_s": 268.6,
+        "emotion": "Happy",
+        "confidence": 0.8909
+      },
+      {
+        "timestamp_s": 268.8,
+        "emotion": "Happy",
+        "confidence": 0.8946
+      },
+      {
+        "timestamp_s": 269.0,
+        "emotion": "Happy",
+        "confidence": 0.8985
+      },
+      {
+        "timestamp_s": 269.2,
+        "emotion": "Happy",
+        "confidence": 0.8878
+      },
+      {
+        "timestamp_s": 269.4,
+        "emotion": "Happy",
+        "confidence": 0.8596
+      },
+      {
+        "timestamp_s": 269.6,
+        "emotion": "Happy",
+        "confidence": 0.8707
+      },
+      {
+        "timestamp_s": 269.8,
+        "emotion": "Happy",
+        "confidence": 0.8612
+      },
+      {
+        "timestamp_s": 270.0,
+        "emotion": "Happy",
+        "confidence": 0.878
+      },
+      {
+        "timestamp_s": 270.2,
+        "emotion": "Happy",
+        "confidence": 0.8603
+      },
+      {
+        "timestamp_s": 270.4,
+        "emotion": "Happy",
+        "confidence": 0.7736
+      },
+      {
+        "timestamp_s": 270.6,
+        "emotion": "Happy",
+        "confidence": 0.7783
+      },
+      {
+        "timestamp_s": 270.8,
+        "emotion": "Happy",
+        "confidence": 0.77
+      },
+      {
+        "timestamp_s": 271.0,
+        "emotion": "Happy",
+        "confidence": 0.7859
+      },
+      {
+        "timestamp_s": 271.2,
+        "emotion": "Happy",
+        "confidence": 0.7879
+      },
+      {
+        "timestamp_s": 271.4,
+        "emotion": "Happy",
+        "confidence": 0.8532
+      },
+      {
+        "timestamp_s": 271.6,
+        "emotion": "Happy",
+        "confidence": 0.8817
+      },
+      {
+        "timestamp_s": 271.8,
+        "emotion": "Happy",
+        "confidence": 0.8905
+      },
+      {
+        "timestamp_s": 272.0,
+        "emotion": "Happy",
+        "confidence": 0.8899
+      },
+      {
+        "timestamp_s": 272.2,
+        "emotion": "Happy",
+        "confidence": 0.8627
+      },
+      {
+        "timestamp_s": 272.4,
+        "emotion": "Happy",
+        "confidence": 0.7935
+      },
+      {
+        "timestamp_s": 272.6,
+        "emotion": "Happy",
+        "confidence": 0.7879
+      },
+      {
+        "timestamp_s": 272.8,
+        "emotion": "Happy",
+        "confidence": 0.7781
+      },
+      {
+        "timestamp_s": 273.0,
+        "emotion": "Happy",
+        "confidence": 0.7024
+      },
+      {
+        "timestamp_s": 273.4,
+        "emotion": "Tension",
+        "confidence": 0.4506
+      },
+      {
+        "timestamp_s": 273.6,
+        "emotion": "Tension",
+        "confidence": 0.5852
+      }
+    ],
+    "summary": {
+      "total_frames_analyzed": 95,
+      "dominant_emotion": "Happy",
+      "dominant_emotion_pct": 51.6,
+      "average_confidence": 0.8378,
+      "emotion_distribution": {
+        "Happy": 51.6,
+        "Sad": 46.3,
+        "Tension": 2.1
+      },
+      "duration_s": 273.73
+    }
+  },
+  "speech": {
+    "overall": 0.076,
+    "grade": "D",
+    "wpm": {
+      "score": 0.944,
+      "raw": 156.9,
+      "unit": "wpm",
+      "label": "Speaking rate",
+      "feedback": "Good pace (157 wpm) — comfortably in the ideal range."
+    },
+    "filler_rate": {
+      "score": -0.739,
+      "raw": 3.79,
+      "unit": "% of words",
+      "label": "Filler words",
+      "feedback": "Moderate filler usage (3.8%) — practise pausing instead of filling."
+    },
+    "pitch_variation": {
+      "score": -0.612,
+      "raw": 80.56,
+      "unit": "Hz σ",
+      "label": "Pitch variation",
+      "feedback": "Very high pitch variation (80.6 Hz) — may sound erratic; aim for intentional changes."
+    },
+    "energy_variation": {
+      "score": 0.561,
+      "raw": 0.0104,
+      "unit": "RMS σ",
+      "label": "Energy variation",
+      "feedback": "Some energy variation (0.0104) — add more deliberate emphasis."
+    },
+    "pause_ratio": {
+      "score": 0.563,
+      "raw": 8.0,
+      "unit": "% of duration",
+      "label": "Pause ratio",
+      "feedback": "Few pauses (8.0%) — allow more breathing room."
+    },
+    "vocal_emotion": {
+      "score": -0.7,
+      "raw": 1.0,
+      "unit": "confidence",
+      "label": "Vocal emotion (Flat / disengaged)",
+      "feedback": "Vocal tone sounds flat or disengaged — project more energy."
+    },
+    "transcript_preview": "HI AND THIS YOUR LECTURE WE WILL INTRODUCE THE DEAR ACDALT OF FUNCTION BEFORE WE GO IN TO THE SPECIFICS OF THE DIRECT ELSIE FURNITURE LOVE AND START WITH AN INTUITION OF WHAT EXACTLY IT IS WE'LL BE THINKING THEM OUR A SERIES O FUNCTIONS OR FAMILY OF FUNCTIONS THAT ARE ALL CENSURED AT THE SAME PLACE …",
+    "segments": [],
+    "timings": {
+      "vad_load": 2.574,
+      "vad_inference": 6.591,
+      "asr_load": 4.258,
+      "asr_inference": 19.406,
+      "asr_chunks": 20,
+      "prosody_inference": 28.641,
+      "emotion_load": 2.362,
+      "emotion_inference": 81.852,
+      "total_speech_analysis": 145.837
+    }
+  },
+  "tone": {
+    "detected_topic": "An introductory lecture on a series of functions in a mathematical context.",
+    "detected_context": "Academic lecture or university class presentation.",
+    "overall_tone_fit": "inappropriate",
+    "tone_fit_score": 0.25,
+    "mismatches": [
+      {
+        "severity": "medium",
+        "observed_tone": "flat / disengaged",
+        "expected_tone": "engaging and clear",
+        "reason": "The speaker's monotone delivery and lack of emotional variation make the technical material feel dull and hard to follow.",
+        "moment": "Opening statement: \"HI AND THIS YOUR LECTURE WE WILL INTRODUCE...\""
+      }
+    ],
+    "coaching_tips": [
+      "Practice varying your pitch by emphasizing key terms (e.g., 'functions', 'family of functions') to break monotony.",
+      "Use intentional pauses after complex phrases to give the audience time to absorb information and to signal importance.",
+      "Record yourself and listen for emotional inflection; aim to convey curiosity and enthusiasm about the topic.",
+      "Keep energy level consistent but add dynamic emphasis on transitions to maintain engagement.",
+      "Reduce filler words by pausing briefly before continuing, allowing you to gather thoughts."
+    ],
+    "model_used": "openai"
+  },
+  "timeline": [
+    {
+      "timestamp_s": 125.0,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.5112
+    },
+    {
+      "timestamp_s": 133.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.8136
+    },
+    {
+      "timestamp_s": 134.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.7801
+    },
+    {
+      "timestamp_s": 178.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.6331
+    },
+    {
+      "timestamp_s": 216.4,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9918
+    },
+    {
+      "timestamp_s": 217.4,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.8377
+    },
+    {
+      "timestamp_s": 226.8,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9651
+    },
+    {
+      "timestamp_s": 227.8,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9619
+    },
+    {
+      "timestamp_s": 232.6,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9995
+    },
+    {
+      "timestamp_s": 237.6,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9689
+    },
+    {
+      "timestamp_s": 238.6,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9732
+    },
+    {
+      "timestamp_s": 239.6,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.9779
+    },
+    {
+      "timestamp_s": 248.8,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.5986
+    },
+    {
+      "timestamp_s": 249.8,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.5196
+    },
+    {
+      "timestamp_s": 250.8,
+      "source": "body_language",
+      "event": "Emotion: Sad",
+      "confidence": 0.6054
+    },
+    {
+      "timestamp_s": 265.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.4094
+    },
+    {
+      "timestamp_s": 266.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.9175
+    },
+    {
+      "timestamp_s": 267.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.9199
+    },
+    {
+      "timestamp_s": 268.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.8909
+    },
+    {
+      "timestamp_s": 269.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.8707
+    },
+    {
+      "timestamp_s": 270.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.7783
+    },
+    {
+      "timestamp_s": 271.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.8817
+    },
+    {
+      "timestamp_s": 272.6,
+      "source": "body_language",
+      "event": "Emotion: Happy",
+      "confidence": 0.7879
+    },
+    {
+      "timestamp_s": 273.6,
+      "source": "body_language",
+      "event": "Emotion: Tension",
+      "confidence": 0.5852
+    }
+  ]
+}

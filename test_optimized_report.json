@@ -1,0 +1,129 @@
+{
+  "meta": {
+    "video": "/home/lain/NOOD/my_speech.mp4",
+    "generated_at": "2026-04-22T16:06:50.280808",
+    "pipeline_duration_s": 49.546,
+    "segment_duration": 0,
+    "process_id": 359856,
+    "cold_start": true,
+    "audio_duration_s": 110.85,
+    "timings": {
+      "audio_extraction": 0.501,
+      "audio_load": 1.218,
+      "speech_tone_analysis": 47.822,
+      "body_analysis": 47.823,
+      "total": 49.546,
+      "speech_detail": {
+        "vad_load": 2.444,
+        "vad_inference": 3.31,
+        "asr_load": 4.317,
+        "asr_inference": 22.57,
+        "prosody_inference": 12.233,
+        "emotion_load": 2.15,
+        "emotion_inference": 0.001,
+        "total_speech_analysis": 47.144
+      }
+    }
+  },
+  "overall_score": 41.9,
+  "overall_grade": "D",
+  "component_scores": {
+    "speech_score": 59.7,
+    "body_language_score": 0.0,
+    "tone_fit_score": 60.0
+  },
+  "body_language_score": 0.0,
+  "body_language": {
+    "frames": [],
+    "summary": {
+      "total_frames_analyzed": 0,
+      "dominant_emotion": "Unknown",
+      "dominant_emotion_pct": 0.0,
+      "average_confidence": 0.0,
+      "emotion_distribution": {},
+      "duration_s": 110.83
+    }
+  },
+  "speech": {
+    "overall": 0.193,
+    "grade": "C",
+    "wpm": {
+      "score": 0.221,
+      "raw": 95.3,
+      "unit": "wpm",
+      "label": "Speaking rate",
+      "feedback": "Very slow (95 wpm) — pick up the pace to maintain audience engagement."
+    },
+    "filler_rate": {
+      "score": -0.526,
+      "raw": 2.34,
+      "unit": "% of words",
+      "label": "Filler words",
+      "feedback": "Good — low filler usage (2.3%)."
+    },
+    "pitch_variation": {
+      "score": 0.976,
+      "raw": 15.36,
+      "unit": "Hz σ",
+      "label": "Pitch variation",
+      "feedback": "Limited pitch variation (15.4 Hz) — add more rises/falls for emphasis."
+    },
+    "energy_variation": {
+      "score": 0.769,
+      "raw": 0.01561,
+      "unit": "RMS σ",
+      "label": "Energy variation",
+      "feedback": "Some energy variation (0.0156) — add more deliberate emphasis."
+    },
+    "pause_ratio": {
+      "score": -0.037,
+      "raw": 2.9,
+      "unit": "% of duration",
+      "label": "Pause ratio",
+      "feedback": "Almost no pauses (2.9%) — use silence strategically for impact."
+    },
+    "vocal_emotion": {
+      "score": 0.0,
+      "raw": 0.5,
+      "unit": "confidence",
+      "label": "Vocal emotion (Neutral)",
+      "feedback": "Neutral vocal tone — consider adding more warmth and enthusiasm."
+    },
+    "transcript_preview": "SO DI EXHAL CENTRE MY PRESENTATION HE IS A ON THE SOUTH HUNTER OH IT SIR THE CENTRE OF ACCIDENTALLY IN THESTRUDON LEADERSHIP I DO THEY DO WELL LOT OF THINKS ARE LIKE ER AH THE AVOW THEREFORE BOBBY SPEAKING LAP AND ER DEY OH THEY ARE TWO CONSULTATION ET THE APH TEMS ERROR NOW THERE THE CONSULTATION T…",
+    "segments": [],
+    "timings": {
+      "vad_load": 2.444,
+      "vad_inference": 3.31,
+      "asr_load": 4.317,
+      "asr_inference": 22.57,
+      "prosody_inference": 12.233,
+      "emotion_load": 2.15,
+      "emotion_inference": 0.001,
+      "total_speech_analysis": 47.144
+    }
+  },
+  "tone": {
+    "detected_topic": "Leadership consulting and organizational development",
+    "detected_context": "Corporate presentation or workshop",
+    "overall_tone_fit": "partially appropriate",
+    "tone_fit_score": 0.6,
+    "mismatches": [
+      {
+        "severity": "medium",
+        "observed_tone": "High energy with strong pitch variation",
+        "expected_tone": "Balanced, confident, and slightly subdued to match serious leadership content",
+        "reason": "The speaker’s energetic delivery may overwhelm the audience when discussing complex leadership concepts, making it harder to absorb key points",
+        "moment": "Throughout the presentation"
+      }
+    ],
+    "coaching_tips": [
+      "Use a steadier pitch by consciously lowering the variation in the lower register, especially when outlining core leadership principles;",
+      "Introduce deliberate pauses after each major point to give the audience time to process the information;",
+      "Match the energy level to the content—lower the intensity during explanations of strategic frameworks and raise it when sharing success stories;",
+      "Practice a neutral emotional tone in rehearsal to avoid sounding overly enthusiastic, ensuring the message of leadership seriousness is conveyed;",
+      "Record and review a short segment to monitor pitch and energy, adjusting as needed to maintain a professional, engaging delivery."
+    ],
+    "model_used": "openai"
+  },
+  "timeline": []
+}

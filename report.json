@@ -1,0 +1,85 @@
+{
+  "meta": {
+    "generated_at": "2026-03-28T10:32:21.607098",
+    "transcript_preview": "transcript.txt"
+  },
+  "speech": {},
+  "body_language": {},
+  "language_and_content": {
+    "grammar": {
+      "errors_detected": 1,
+      "examples": [
+        {
+          "original": "transcript.txt",
+          "corrected": ""
+        }
+      ],
+      "grammar_score": 2.0,
+      "feedback": "Significant grammar issues (1 errors, 100.0% error rate). Substantial revision recommended.",
+      "model_used": "AventIQ-AI/T5-small-grammar-correction"
+    },
+    "sentence_structure": {
+      "average_length": 1.0,
+      "length_variety": 0.0,
+      "total_sentences": 1,
+      "short_sentences": 1,
+      "long_sentences": 0,
+      "variety_level": "low",
+      "category": "choppy",
+      "feedback": "Short average sentence length (1.0 words). Low variety in sentence length (σ=0.0). Many short sentences (100% are ≤5 words).",
+      "suggestions": [
+        "Vary your sentence length to maintain audience interest.",
+        "Alternate between short punchy sentences and longer complex ones.",
+        "Combine some short sentences to create more complex ideas.",
+        "Use longer sentences for ideas that deserve elaboration."
+      ]
+    },
+    "vocabulary": {
+      "total_words": 2,
+      "unique_words": 2,
+      "type_token_ratio": 1.0,
+      "vocabulary_level": "advanced",
+      "richness_score": 10.0,
+      "common_words": 0,
+      "rare_words": 2,
+      "feedback": "Advanced vocabulary level (TTR=1.00). Excellent richness score (10.0/10). High word uniqueness (2 unique from 2 total).",
+      "suggestions": [
+        "Excellent lexical diversity. Maintain this level of vocabulary richness."
+      ]
+    },
+    "fluency": {
+      "repetition_count": 0,
+      "repetition_examples": [],
+      "fluency_score": 10.0,
+      "fluency_level": "excellent",
+      "primary_issues": [],
+      "feedback": "Excellent fluency (score: 10.0/10).",
+      "suggestions": [
+        "Your speech flows naturally with minimal repetition. Maintain this smooth delivery."
+      ]
+    },
+    "consolidated": {
+      "grammar_score": 2.0,
+      "sentence_structure_score": 4.5,
+      "vocabulary_score": 10.0,
+      "fluency_score": 10.0,
+      "overall_language_score": 6.6,
+      "strengths": [
+        "Rich and sophisticated vocabulary",
+        "Excellent speech fluency and flow"
+      ],
+      "areas_for_improvement": [
+        "Grammar needs attention (multiple errors detected)",
+        "Sentence structure lacks variety (repetitive patterns)"
+      ],
+      "top_recommendations": [
+        "Priority: Fix grammar errors (1 issues found)",
+        "Vary your sentence lengths and structures"
+      ],
+      "feedback": "Overall Language & Content Score: 6.6/10\nStrengths: Rich and sophisticated vocabulary, Excellent speech fluency and flow\nAreas to improve: Grammar needs attention (multiple errors detected), Sentence structure lacks variety (repetitive patterns)"
+    }
+  },
+  "overall_confidence_score": 5.4,
+  "overall_grade": "C+",
+  "overall_proficiency": "Satisfactory"
+}
