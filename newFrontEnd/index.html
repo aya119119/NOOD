@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>NOOD — Precision in Public Speaking</title>
+<link rel="icon" type="image/png" href="assets/nood_logo.png" />
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,500;1,600&family=Inter:wght@400;450;500;600&family=JetBrains+Mono:wght@400;500&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,300,0,0&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* palette */
+    --ink:        #0F0866;
+    --ink-2:      #1a1372;
+    --ink-soft:   #4a4480;
+    --muted:      #6b6794;
+    --muted-2:    #9a96b8;
+    --rule:       #e6e4f3;
+    --rule-soft:  #efeef7;
+    --bg:         #fbfbff;
+    --bg-2:       #f6f5fc;
+    --card:       #ffffff;
+    --hover:      #f4f3fa;
+    --accent:     #6b5cff;     /* used VERY sparingly */
+    --good:       #1f9d6e;
+    --warn:       #c98615;
+    --bad:        #c0392b;
+    /* type */
+    --display: 'Plus Jakarta Sans', sans-serif;
+    --body: 'Inter', sans-serif;
+    --mono: 'JetBrains Mono', monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: var(--body);
+    background: var(--bg);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  ::selection { background: rgba(15,8,102,0.12); }
+
+  /* type primitives */
+  .display { font-family: var(--display); font-weight: 700; letter-spacing: -0.02em; line-height: 1.05; }
+  .display-italic { font-family: var(--display); font-weight: 600; font-style: italic; letter-spacing: -0.02em; }
+  .h1 { font-family: var(--display); font-weight: 700; letter-spacing: -0.015em; line-height: 1.15; font-size: 32px; }
+  .h2 { font-family: var(--display); font-weight: 600; letter-spacing: -0.01em; line-height: 1.2; font-size: 22px; }
+  .h3 { font-family: var(--display); font-weight: 600; letter-spacing: -0.005em; line-height: 1.3; font-size: 16px; }
+  .eyebrow { font-family: var(--body); font-size: 11px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.14em; color: var(--muted); }
+  .mono { font-family: var(--mono); font-size: 12px; letter-spacing: 0.01em; }
+  .num  { font-family: var(--display); font-feature-settings: "tnum"; font-variant-numeric: tabular-nums; }
+
+  /* utility */
+  .hr { height: 1px; background: var(--rule); border: 0; }
+  .icon { font-family: 'Material Symbols Outlined'; font-weight: normal; font-style: normal; font-size: 20px; line-height: 1; letter-spacing: normal; text-transform: none; display: inline-block; white-space: nowrap; word-wrap: normal; direction: ltr; user-select: none; -webkit-font-feature-settings: 'liga'; -webkit-font-smoothing: antialiased; font-variant-ligatures: discretionary-ligatures; text-rendering: optimizeLegibility; font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; }
+
+  button { font-family: inherit; }
+
+  /* scrollbar tame */
+  *::-webkit-scrollbar { width: 10px; height: 10px; }
+  *::-webkit-scrollbar-thumb { background: var(--rule); border-radius: 999px; }
+  *::-webkit-scrollbar-thumb:hover { background: var(--muted-2); }
+
+  /* shell */
+  #root { min-height: 100vh; }
+
+  /* responsive — collapse 2-col landing hero to single column on narrow viewports */
+  @media (max-width: 960px) {
+    .hero-grid { grid-template-columns: 1fr !important; gap: 40px !important; }
+    .hero-grid > div:last-child { max-width: 100% !important; margin: 0 auto !important; }
+    .two-col { grid-template-columns: 1fr !important; }
+    .four-col { grid-template-columns: repeat(2, 1fr) !important; }
+  }
+  @media (max-width: 640px) {
+    .three-col { grid-template-columns: 1fr !important; }
+    .four-col { grid-template-columns: 1fr 1fr !important; }
+  }
+
+  /* keyframes */
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  @keyframes slideIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+  @keyframes pulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+  @keyframes shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+  @keyframes wave { 0%,100% { transform: scaleY(0.4); } 50% { transform: scaleY(1); } }
+
+  .fade-in { animation: fadeIn 0.4s ease both; }
+  .slide-in { animation: slideIn 0.5s ease both; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<script type="text/babel" src="src/i18n.jsx"></script>
+<script type="text/babel" src="src/data.jsx"></script>
+<script type="text/babel" src="src/components.jsx"></script>
+<script type="text/babel" src="src/screens/Landing.jsx"></script>
+<script type="text/babel" src="src/screens/Auth.jsx"></script>
+<script type="text/babel" src="src/screens/Workspace.jsx"></script>
+<script type="text/babel" src="src/screens/Processing.jsx"></script>
+<script type="text/babel" src="src/screens/Report.jsx"></script>
+<script type="text/babel" src="src/screens/History.jsx"></script>
+<script type="text/babel" src="src/app.jsx"></script>
+
+</body>
+</html>
